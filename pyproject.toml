@@ -1,0 +1,25 @@
+# Tooling config for ai-sim-company. Runtime deps live in requirements.txt
+# (kept separate so the Dockerfiles can `pip install -r` them directly).
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.ruff.lint.per-file-ignores]
+"aisim/llm/prompts/*" = []
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+# `hermes` has no stubs; agent runtime is an entrypoint not imported by the hub.
+exclude = ["aisim/agent/runtime.py"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

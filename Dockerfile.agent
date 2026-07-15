@@ -1,0 +1,27 @@
+# Dockerfile.agent - Agent 基础镜像
+#
+# 设计原则: 基础镜像不含身份，身份 100% 由启动参数定义。
+# 容器启动时仅认两个环境变量: REDIS_URL / AGENT_ID。
+# 身份 Profile 由 Company Hub 在 Agent 上线时通过 Redis 下发。
+
+FROM python:3.12-slim
+
+LABEL org.aisim.role="agent-base"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 安装依赖 (包含 hermes-agent 运行时)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制整个 aisim 包，使 Hub 与 Agent 内部导入统一为 aisim.*
+# (与设计文档“仅复制 agent/+shared/”的写法略有偏差，理由见 README)
+COPY aisim/ ./aisim/
+
+# ★ 仅两个启动参数
+ENV REDIS_URL=redis://redis:6379
+ENTRYPOINT ["python", "-m", "aisim.agent.runtime"]

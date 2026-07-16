@@ -1,8 +1,8 @@
-"""Redis 消息总线 - 所有通信的唯一骨干 (见 §六)。
+"""Redis message bus - the sole backbone for all communication (see §六).
 
-四种通信模式: DM / Channel / Meeting / Announcement。
-统一走 Redis Pub/Sub，通道命名见 aisim.shared.channels。
-同时提供 JSON 状态存储助手 (供 ProfileRegistry / AgentManager 落盘)。
+Four communication modes: DM / Channel / Meeting / Announcement.
+All go through Redis Pub/Sub; channel naming is in aisim.shared.channels.
+Also provides JSON state storage helpers (for ProfileRegistry / AgentManager persistence).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from aisim.shared.models import Message, MessageType, Priority
 
 logger = logging.getLogger(__name__)
 
-# Agent -> Hub 的事件通道
+# Agent -> Hub event channels
 _AGENT_EVENT_CHANNELS = [
     channels.AGENT_REGISTER,
     channels.AGENT_READY,
@@ -30,7 +30,7 @@ _AGENT_EVENT_CHANNELS = [
 
 
 class MessageBus:
-    """Redis Pub/Sub 消息路由 + 状态存储助手。"""
+    """Redis Pub/Sub message routing + state storage helpers."""
 
     def __init__(self) -> None:
         self._redis: Redis | None = None
@@ -55,16 +55,16 @@ class MessageBus:
         assert self._redis is not None, "MessageBus 未连接; 先调用 connect()"
         return self._redis
 
-    # ── 基础发布 ──
+    # ── Base publish ──
     async def publish(self, channel: str, data: dict) -> None:
         await self.redis.publish(channel, json.dumps(data, default=str))
 
     async def broadcast_tick(self, tick: int) -> None:
-        """Hub -> All Agents: 仿真时钟信号。"""
+        """Hub -> All Agents: simulation clock signal."""
         await self.publish(channels.SIMULATION_TICK, {"tick": tick})
 
     async def send(self, message: Message) -> None:
-        """按 Message.type 投递到收件箱 / 频道 / 全体。"""
+        """Deliver to inbox / channel / all by Message.type."""
         payload = json.dumps(message.__dict__, default=str)
         if message.type == MessageType.DM:
             for recipient in message.recipients:
@@ -76,7 +76,7 @@ class MessageBus:
         else:
             await self.publish(channels.HUB_ACTION, message.__dict__)
 
-    # ── 便捷构造 ──
+    # ── Convenience constructors ──
     async def send_dm(self, sender: str, recipient: str, content: str) -> None:
         await self.send(
             Message(
@@ -101,9 +101,9 @@ class MessageBus:
             )
         )
 
-    # ── 监听 Agent 上报 ──
+    # ── Listen for Agent reports ──
     async def listen_agents(self, handler: Callable[[dict], Awaitable[None]]) -> None:
-        """订阅 Agent -> Hub 通道，逐条交给 handler。"""
+        """Subscribe to Agent -> Hub channels, handing each message to the handler."""
         self._listener_task = asyncio.create_task(self._listen_loop(handler))
 
     async def _listen_loop(self, handler: Callable[[dict], Awaitable[None]]) -> None:
@@ -124,7 +124,7 @@ class MessageBus:
             await pubsub.unsubscribe(*_AGENT_EVENT_CHANNELS)
             await pubsub.aclose()
 
-    # ── JSON 状态存储助手 (hash / string) ──
+    # ── JSON state storage helpers (hash / string) ──
     async def set_json(self, key: str, value: Any) -> None:
         await self.redis.set(key, json.dumps(value, default=str))
 

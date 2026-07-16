@@ -1,7 +1,7 @@
-"""Agent 个人记忆管理 (见 §四: Company Hub 不维护 Agent 个人记忆)。
+"""Agent personal memory management (see §四: Company Hub does not maintain Agent personal memory).
 
-每个 Agent 容器内独立维护; MVP 阶段可用本地 SQLite + 向量检索，
-后续可接入 Hermes 内置记忆系统。
+Maintained independently inside each Agent container; during the MVP phase local SQLite + vector retrieval can be used,
+and Hermes' built-in memory system can be integrated later.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Any
 
 @dataclass
 class MemoryEntry:
-    """一条记忆。"""
+    """A single memory entry."""
 
     id: str
     content: str
@@ -23,19 +23,19 @@ class MemoryEntry:
 
 
 class MemoryManager:
-    """Agent 记忆管理器 - 容器内运行。"""
+    """Agent memory manager - runs inside the container."""
 
     def __init__(self, agent_id: str) -> None:
         self.agent_id = agent_id
         self._entries: list[MemoryEntry] = []
 
     def add(self, entry: MemoryEntry) -> None:
-        """追加一条记忆。"""
+        """Append a memory entry."""
         self._entries.append(entry)
 
     def recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
-        """检索相关记忆 (TODO: 接入向量检索 / FTS5)。"""
-        # TODO: 按 query 做语义/关键词检索并按 importance 排序
+        """Retrieve relevant memories (TODO: integrate vector retrieval / FTS5)."""
+        # TODO: perform semantic/keyword retrieval by query and sort by importance
         return self._entries[-limit:]
 
     def recent(self, limit: int = 20) -> list[MemoryEntry]:

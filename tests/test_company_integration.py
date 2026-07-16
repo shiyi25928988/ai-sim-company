@@ -1,7 +1,7 @@
-"""Company Hub 集成测试 - 需要真实 Redis。
+"""Company Hub integration tests - requires real Redis.
 
-跳过条件: 未安装 redis，或未设置 REDIS_URL / REDIS_HOST+REDIS_PASSWORD。
-运行示例:
+Skip condition: redis not installed, or REDIS_URL / REDIS_HOST+REDIS_PASSWORD not set.
+Run example:
     REDIS_HOST=localhost REDIS_PASSWORD=123456 pytest tests/test_company_integration.py -q
 """
 
@@ -11,10 +11,10 @@ import os
 
 import pytest
 
-# 整个模块依赖 redis; 未安装则全部跳过。
+# The whole module depends on redis; skip all if not installed.
 pytest.importorskip("redis")
 
-import aisim  # noqa: E402,F401  触发 aisim/__init__.py 自动加载 .env (REDIS 配置)
+import aisim  # noqa: E402,F401  triggers aisim/__init__.py to auto-load .env (REDIS config)
 
 pytestmark = pytest.mark.asyncio
 
@@ -37,7 +37,7 @@ def hub():
 
     cfg = load_config("config/company.yaml")
     h = CompanyHub(cfg)
-    yield h, channels  # 同步 yield; start/stop 在每个用例内显式控制
+    yield h, channels  # synchronous yield; start/stop controlled explicitly in each test
 
 
 async def test_ceo_seeded(hub):
@@ -65,7 +65,7 @@ async def test_create_and_list_agent(hub):
         agents = await h.agent_manager.list()
         ids = [a["agent_id"] for a in agents]
         assert state["agent_id"] in ids
-        # 经济系统应已计入薪资
+        # economy should have accounted for the salary
         assert h.economy.state.monthly_burn == 130000
     finally:
         await h.message_bus.delete(ch.KEY_AGENTS, ch.KEY_PROFILES, ch.KEY_TASKS)
@@ -80,7 +80,7 @@ async def test_snapshot_shape(hub):
         assert "economy" in snap
         assert "capital" in snap["economy"]
         assert isinstance(snap["agents"], list)
-        assert snap["running"] is False  # 默认暂停 (SIM_AUTO_START=false)
+        assert snap["running"] is False  # paused by default (SIM_AUTO_START=false)
     finally:
         await h.message_bus.delete(ch.KEY_AGENTS, ch.KEY_PROFILES, ch.KEY_TASKS)
         await h.stop()
@@ -100,7 +100,7 @@ async def test_remove_agent(hub):
 
 
 async def test_rehydrate_agents_after_restart(hub):
-    """Hub 重启后，Redis 里的 Agent 应被重新注册到 runner (恢复思考)。"""
+    """After Hub restart, Agents in Redis should be re-registered to the runner (resume thinking)."""
     from aisim.company.hub import CompanyHub
     from aisim.shared.config import load_config
 
@@ -113,14 +113,14 @@ async def test_rehydrate_agents_after_restart(hub):
         )
         assert h.agent_runner.has(state["agent_id"])
     finally:
-        await h.stop()  # 不清 Redis，保留 Agent 供重启恢复
+        await h.stop()  # do not clear Redis, keep Agents for restart recovery
 
-    # 重启: 新 Hub，Redis 里还有 CEO + Jordan
+    # restart: new Hub, Redis still has CEO + Jordan
     cfg = load_config("config/company.yaml")
     h2 = CompanyHub(cfg)
     await h2.start()
     try:
-        # _rehydrate_agents 应把 CEO + Jordan 都注册回 runner
+        # _rehydrate_agents should register both CEO and Jordan back to the runner
         assert h2.agent_runner.has(h2.config.ceo.agent_id)
         assert state is not None
         assert h2.agent_runner.has(state["agent_id"])

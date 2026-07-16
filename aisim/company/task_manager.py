@@ -1,7 +1,7 @@
-"""任务管理 - CEO/HR 创建任务，工程师认领并完成 (见 §三 任务分解与分配)。
+"""Task management - CEO/HR create tasks, engineers claim and complete them (see §三 task decomposition and assignment).
 
-Task 落盘到 Redis hash (aisim:tasks)。认领模型: 任务可指定 assignee_role，
-该角色的任一 Agent 可认领；第一个 complete 的 Agent 赢得归属。
+Tasks are persisted to a Redis hash (aisim:tasks). Claim model: a task may specify an assignee_role,
+and any Agent of that role may claim it; the first Agent to complete wins ownership.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def _from_dict(data: dict) -> Task:
 
 
 class TaskManager:
-    """Redis 任务池。"""
+    """Redis task pool."""
 
     def __init__(self, bus: MessageBus) -> None:
         self.bus = bus
@@ -87,7 +87,7 @@ class TaskManager:
             logger.info("任务已被 %s 完成: %s", task.completed_by, task_id)
             return task
         if task.assignee == "":
-            task.assignee = agent_id  # 认领
+            task.assignee = agent_id  # claim
         task.status = TaskStatus.DONE
         task.result = result
         task.completed_by = agent_id
@@ -114,8 +114,8 @@ class TaskManager:
         return _to_dict(task)
 
     async def pending_for(self, agent_id: str, role: str) -> list[Task]:
-        """某 Agent 当前可做的任务: 已派给它的 (pending/in_progress) +
-        派给它角色且未认领的 (pending)。"""
+        """Tasks currently actionable for an Agent: those assigned to it (pending/in_progress) +
+        those assigned to its role and unclaimed (pending)."""
         tasks = await self.list()
         out = []
         for t in tasks:

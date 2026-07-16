@@ -4,8 +4,8 @@ import { OfficeScene } from "./scenes/OfficeScene";
 import { MeetingScene } from "./scenes/MeetingScene";
 
 /**
- * 创建 Phaser 3 像素风办公室游戏实例。
- * 场景: Boot (加载资源) -> Office (主办公室) + Meeting (会议室特写)。
+ * Create a Phaser 3 pixel-art office game instance.
+ * Scenes: Boot (load assets) -> Office (main office) + Meeting (meeting room close-up).
  */
 export function createGame(parent: HTMLElement): Phaser.Game {
   return new Phaser.Game({

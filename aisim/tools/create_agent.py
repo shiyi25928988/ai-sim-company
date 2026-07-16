@@ -1,6 +1,6 @@
-"""create_agent - 创建新 Agent (CEO / HR Director 可用，见 §四)。
+"""create_agent - create a new Agent (available to CEO / HR Director, see §四).
 
-落地: Company Hub 通过 Docker API 启动容器 + 生成并下发 Profile。
+Implementation: Company Hub starts a container via the Docker API + generates and pushes a Profile.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ class CreateAgentTool(BaseTool):
 
     async def execute(self, **kwargs):  # type: ignore[override]
         # TODO: profile_registry.generate_profile -> agent_manager.create_agent
-        #       -> 等待报到 -> 下发 Profile -> 通知前端 -> 扣减薪资预算
+        #       -> wait for report-in -> push Profile -> notify frontend -> deduct salary budget
         return {"status": "pending", "name": kwargs.get("name"), "role": kwargs.get("role")}
 
 

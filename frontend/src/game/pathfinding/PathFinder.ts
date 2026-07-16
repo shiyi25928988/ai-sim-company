@@ -1,17 +1,17 @@
 import * as EasyStar from "easystarjs";
 
-/** A* 寻路封装 (EasyStar.js) - Agent 在办公室中走动 (见 §十)。 */
+/** A* pathfinding wrapper (EasyStar.js) - agents walking around the office (see §10). */
 export class PathFinder {
   private readonly easystar: EasyStar.js;
 
   constructor(grid: number[][]) {
     this.easystar = new EasyStar.js();
     this.easystar.setGrid(grid);
-    this.easystar.setAcceptableTiles([0]); // 0 = 可通行
+    this.easystar.setAcceptableTiles([0]); // 0 = walkable
     this.easystar.enableDiagonals();
   }
 
-  /** 异步计算路径; 返回格子坐标列表。 */
+  /** Compute a path asynchronously; returns a list of tile coords. */
   findPath(
     fromX: number,
     fromY: number,

@@ -1,4 +1,4 @@
-"""learn_skill - Junior 主动从公司池搜索并学习一个 Skill (见 §八)。"""
+"""learn_skill - a Junior proactively searches the company pool and learns a Skill (see §八)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ class LearnSkillTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 调 hub.learn_skill
+        # TODO: call hub.learn_skill
         return {"status": "ok", "query": kwargs.get("query")}
 
 

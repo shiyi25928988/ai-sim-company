@@ -1,4 +1,4 @@
-"""TaskManager 单元测试 - 用 FakeBus (无 Redis)。"""
+"""TaskManager unit tests - uses FakeBus (no Redis)."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ async def test_create_and_list():
     assert t.assignee_role == "senior-engineer"
     tasks = await tm.list()
     assert len(tasks) == 1 and tasks[0].title == "搭 API"
-    # list_dicts (snapshot 用) 必须可序列化 - 回归: status 须是 enum 否则 .value 崩
+    # list_dicts (for snapshot) must be serializable - regression: status must be enum or .value crashes
     dicts = await tm.list_dicts()
     assert dicts[0]["status"] == "pending"
     assert dicts[0]["id"] == t.id
@@ -51,7 +51,7 @@ async def test_complete_claims_and_marks_done():
     assert done.status == TaskStatus.DONE
     assert done.assignee == "eng-jordan"
     assert done.result == "写好 10 个用例"
-    # 第二个 Agent 再完成: 第一个赢 (幂等)
+    # second agent completes again: first one wins (idempotent)
     again = await tm.complete(t.id, "eng-sam", "x", tick=3)
     assert again.completed_by == "eng-jordan"
 
@@ -65,6 +65,6 @@ async def test_pending_for_role_and_assignee():
 
     pend = await tm.pending_for("eng-jordan", "senior-engineer")
     ids = {t.id for t in pend}
-    assert t1.id in ids          # 角色匹配且未认领
-    assert t2.id not in ids      # 已完成
-    assert t3.id not in ids      # 角色不匹配
+    assert t1.id in ids          # role matches and unclaimed
+    assert t2.id not in ids      # already completed
+    assert t3.id not in ids      # role does not match

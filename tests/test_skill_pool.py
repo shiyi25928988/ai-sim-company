@@ -1,4 +1,4 @@
-"""SkillPool 单元测试 - 用 FakeBus (无 Redis)。"""
+"""SkillPool unit tests - uses FakeBus (no Redis)."""
 
 from __future__ import annotations
 
@@ -32,18 +32,18 @@ async def test_seed_presets_idempotent():
     pool = SkillPool(FakeBus())  # type: ignore[arg-type]
     n1 = await pool.seed_presets()
     n2 = await pool.seed_presets()
-    assert n1 > 0 and n2 == 0  # 第二次全跳过
+    assert n1 > 0 and n2 == 0  # second run skips all
 
 
 async def test_effective_skills_role_inheritance():
     pool = SkillPool(FakeBus())  # type: ignore[arg-type]
     await pool.seed_presets()
-    # senior-engineer 继承: Python 开发 (scope 含 senior) + 代码审查规范 (仅 senior)
+    # senior-engineer inherits: Python dev (scope includes senior) + code review spec (senior only)
     sr = await pool.get_effective_skills("eng-jordan", "senior-engineer", "Engineering")
     sr_names = {s.name for s in sr}
     assert "Python 开发" in sr_names
     assert "代码审查规范" in sr_names
-    # junior-engineer: 继承 Python 开发 + Git 基础，但不继承 代码审查规范
+    # junior-engineer: inherits Python dev + Git basics, but not code review spec
     jr = await pool.get_effective_skills("eng-sam", "junior-engineer", "Engineering")
     jr_names = {s.name for s in jr}
     assert "Python 开发" in jr_names

@@ -1,1 +1,1 @@
-"""通信子包 - Redis Pub/Sub 消息路由 + 会议系统 (见 §六)。"""
+"""Communication subpackage - Redis Pub/Sub message routing + meeting system (see §六)."""

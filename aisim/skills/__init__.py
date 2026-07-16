@@ -1,4 +1,4 @@
-"""Skill 管理子包 - 公司级 Skill Pool + Agent↔Hub 同步 + 预设 (见 §八)。
+"""Skill management subpackage - company-level Skill Pool + Agent↔Hub sync + presets (see §八).
 
-双层分工: Hermes (Agent 容器内) 负责"学"，Company Pool 负责"管"。
+Two-layer division: Hermes (inside the Agent container) is responsible for "learning", the Company Pool for "managing".
 """

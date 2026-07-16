@@ -1,7 +1,8 @@
-"""会议系统 - LLM 主持 + 自动纪要 (见 §六 Meeting N:N)。
+"""Meeting system - LLM-hosted with auto minutes (see §6 Meeting N:N).
 
-单次 LLM 调用: LLM 扮演主持人，让每位参会者 (按角色) 发言，最后输出纪要
-(决议 / 待办 / 负责人)。纪要广播给参会者并推前端。
+A single LLM call: the LLM plays the host, lets each participant speak (by role),
+and finally outputs minutes (decisions / action items / owners). Minutes are
+broadcast to participants and pushed to the frontend.
 """
 
 from __future__ import annotations
@@ -15,18 +16,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Meeting:
-    """一次会议 (N:N，由 LLM 主持)。"""
+    """A single meeting (N:N, hosted by LLM)."""
 
     id: str
     topic: str
-    participants: list[str] = field(default_factory=list)  # agent_id 列表
+    participants: list[str] = field(default_factory=list)  # list of agent_ids
     transcript: list[dict] = field(default_factory=list)
     minutes: str = ""
     status: str = "scheduled"  # scheduled | ongoing | ended
 
 
 class MeetingSystem:
-    """会议调度与 LLM 主持。"""
+    """Meeting scheduling and LLM hosting."""
 
     def __init__(self) -> None:
         self._meetings: dict[str, Meeting] = {}
@@ -41,7 +42,7 @@ class MeetingSystem:
         return self._meetings.get(meeting_id)
 
     async def run(self, meeting, participants_info, host_profile, llm_gateway) -> str:
-        """LLM 主持整场会议并产出纪要 (单次调用)。"""
+        """Host the entire meeting via LLM and produce minutes (single call)."""
         prompt = self._build_prompt(meeting.topic, participants_info)
         meeting.status = "ongoing"
         try:
@@ -60,7 +61,7 @@ class MeetingSystem:
 
     @staticmethod
     def _build_prompt(topic: str, participants_info: list[dict]) -> str:
-        """渲染 meeting.j2; jinja2/模板缺失时回退内联。"""
+        """Render meeting.j2; fall back to inline prompt if jinja2/template is missing."""
         try:
             from jinja2 import Environment, FileSystemLoader
 
@@ -71,6 +72,6 @@ class MeetingSystem:
         except Exception:  # noqa: BLE001
             parts = ", ".join(f"{p['name']}({p['role']})" for p in participants_info)
             return (
-                f"你正在主持一场会议。\n主题: {topic}\n参会者: {parts}\n"
-                "依次让参会者发言并输出纪要 (决议/待办/负责人)。"
+                f"You are hosting a meeting.\nTopic: {topic}\nParticipants: {parts}\n"
+                "Let each participant speak in turn, then output minutes (decisions/action items/owners)."
             )

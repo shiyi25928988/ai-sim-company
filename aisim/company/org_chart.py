@@ -1,4 +1,4 @@
-"""组织架构 - 角色 / 部门 / 汇报线 (见 §四 report_to)。"""
+"""Org chart - roles / departments / reporting lines (see §四 report_to)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ class OrgNode:
 
 
 class OrgChart:
-    """组织架构树。"""
+    """Org chart tree."""
 
     def __init__(self) -> None:
         self._nodes: dict[str, OrgNode] = {}

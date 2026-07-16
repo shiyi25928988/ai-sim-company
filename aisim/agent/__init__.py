@@ -1,6 +1,6 @@
-"""Agent 子包 - 容器内运行的 Agent Runtime (见 §四/§五)。
+"""Agent subpackage - the Agent Runtime that runs inside the container (see §四/§五).
 
-本子包仅在 Agent 容器内执行; Hub 不应导入 runtime.py (其依赖 hermes)。
+This subpackage only executes inside the Agent container; the Hub should not import runtime.py (it depends on hermes).
 """
 
 from __future__ import annotations
@@ -11,10 +11,10 @@ __all__ = ["agent_id", "redis_url"]
 
 
 def agent_id() -> str:
-    """当前容器的 Agent 身份证号 (启动参数)。"""
+    """The Agent ID of the current container (startup parameter)."""
     return os.environ["AGENT_ID"]
 
 
 def redis_url() -> str:
-    """Redis 连接地址 (启动参数)。"""
+    """Redis connection URL (startup parameter)."""
     return os.environ["REDIS_URL"]

@@ -1,7 +1,7 @@
-"""SimulatedAgentRunner 测试 (含多轮工具循环)。
+"""SimulatedAgentRunner tests (including multi-turn tool loops).
 
-单元测试用 FakeHub (无 Redis/LLM)，FakeGateway 按顺序返回一组响应模拟多轮。
-live 用例需 LLM_LIVE_TEST=1 + 真实 key + Redis。
+Unit tests use FakeHub (no Redis/LLM), FakeGateway returns a set of responses in order to simulate multiple turns.
+live tests require LLM_LIVE_TEST=1 + real key + Redis.
 """
 
 from __future__ import annotations
@@ -28,12 +28,12 @@ def _profile() -> AgentProfile:
 
 
 def _tc(name: str, args: dict) -> dict:
-    """构造一个 tool_call。"""
+    """Construct a tool_call."""
     return {"id": name, "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
 
 
 class FakeGateway:
-    """按顺序返回一组响应 (模拟多轮 LLM 回复)；耗尽后返回无工具的终止回复。"""
+    """Returns a set of responses in order (simulating multi-turn LLM replies); after exhaustion returns a terminal reply with no tools."""
 
     def __init__(self, *responses: LLMResponse) -> None:
         self.responses = list(responses)
@@ -120,7 +120,7 @@ class FakeHub:
         return "会议纪要: 决定招聘2名工程师。"
 
 
-# ── 单元 ──
+# ── Unit ──
 
 
 async def test_tick_calls_gateway_with_prompt():
@@ -128,7 +128,7 @@ async def test_tick_calls_gateway_with_prompt():
     runner = SimulatedAgentRunner(hub)
     runner.register(_profile())
     await runner._agent_tick("ceo-alex", await hub.snapshot())
-    assert len(hub.llm_gateway.calls) == 1  # 无 tool_calls -> 单轮结束
+    assert len(hub.llm_gateway.calls) == 1  # no tool_calls -> single turn ends
     msg = hub.llm_gateway.calls[0]["messages"][0]["content"]
     assert "Alex" in msg and "ceo" in msg
     assert any(e["type"] == "agent_message" for e in hub.events)
@@ -228,7 +228,7 @@ async def test_tick_call_meeting_dispatch():
 
 
 async def test_multi_turn_chains_two_tools():
-    """一个 tick 内连续调用两个工具 (create_agent -> send_message)，结果回填后结束。"""
+    """Within one tick, calls two tools in sequence (create_agent -> send_message), results fed back then ends."""
     hub = FakeHub(
         LLMResponse(content="", tool_calls=[_tc("create_agent", {"name": "Taylor", "role": "hr-director"})], usage={"total_tokens": 1}),
         LLMResponse(content="", tool_calls=[_tc("send_message", {"recipient": "hr-taylor", "content": "开始招聘"})], usage={"total_tokens": 1}),
@@ -239,8 +239,8 @@ async def test_multi_turn_chains_two_tools():
     await runner._agent_tick("ceo-alex", await hub.snapshot())
     assert len(hub.created) == 1
     assert len(hub.message_bus.dms) == 1
-    assert len(hub.llm_gateway.calls) == 3  # 工具->工具->结束
-    # 第二轮的 messages 应包含第一轮的 tool 结果
+    assert len(hub.llm_gateway.calls) == 3  # tool->tool->end
+    # second turn's messages should contain the first turn's tool result
     msg_roles = [m["role"] for m in hub.llm_gateway.calls[1]["messages"]]
     assert "tool" in msg_roles
 
@@ -251,7 +251,7 @@ async def test_error_response_emits_action():
     runner.register(_profile())
     await runner._agent_tick("ceo-alex", await hub.snapshot())
     assert any("LLM 错误" in e.get("action", "") for e in hub.events)
-    assert len(hub.llm_gateway.calls) == 1  # 出错即停
+    assert len(hub.llm_gateway.calls) == 1  # stop on error
 
 
 async def test_on_tick_skips_busy_agent():
@@ -283,10 +283,10 @@ async def test_think_every_skips_off_ticks():
     runner = SimulatedAgentRunner(hub)
     runner.register(_profile())
     await runner.start()
-    await runner.on_tick(1)  # 1 % 2 != 0 -> 跳过
+    await runner.on_tick(1)  # 1 % 2 != 0 -> skip
     await asyncio.sleep(0.02)
     assert len(hub.llm_gateway.calls) == 0
-    await runner.on_tick(2)  # 2 % 2 == 0 -> 思考
+    await runner.on_tick(2)  # 2 % 2 == 0 -> think
     await asyncio.sleep(0.05)
     assert len(hub.llm_gateway.calls) == 1
     await runner.stop()
@@ -304,7 +304,7 @@ async def test_recent_memory_records_thought():
 
 
 async def test_run_tick_sequential_awaits_all_agents():
-    """单步模式: 多个 Agent 依次执行并被 await (而非 fire-and-forget)。"""
+    """Single-step mode: multiple Agents execute sequentially and are awaited (not fire-and-forget)."""
     hub = FakeHub(
         LLMResponse(content="A思考", usage={"total_tokens": 1}),
         LLMResponse(content="B思考", usage={"total_tokens": 1}),
@@ -314,27 +314,27 @@ async def test_run_tick_sequential_awaits_all_agents():
     runner.register(AgentProfile(agent_id="b", name="B", role="ceo", department="E", personality=Personality(), tools=[]))
     await runner.start()
     await runner.run_tick_sequential(1)
-    # 顺序执行完毕后，两个 Agent 都已思考 (无需 sleep 等待)
+    # after sequential execution, both Agents have thought (no sleep needed)
     assert len(hub.llm_gateway.calls) == 2
     await runner.stop()
 
 
 async def test_ceo_directive_delegates_hiring_to_hr():
-    """CEO 分工: 只直接招 HR；HR 在位后招工程师应委派给 HR，不自己 create_agent。"""
+    """CEO division of labor: only directly hires HR; once HR is in place, hiring engineers should be delegated to HR, not done via create_agent oneself."""
     ceo = AgentProfile(agent_id="c", name="C", role="ceo", department="E", personality=Personality())
-    # 无 HR -> CEO 亲自招 HR Director
+    # no HR -> CEO personally hires HR Director
     d0 = SimulatedAgentRunner._directive(ceo, [{"role": "ceo"}], [])
     assert "HR Director" in d0 and "create_agent" in d0
-    # 有 HR、无工程师 -> CEO 委派，禁止自己招工程师
+    # has HR, no engineers -> CEO delegates, forbidden from hiring engineers oneself
     d1 = SimulatedAgentRunner._directive(ceo, [{"role": "ceo"}, {"role": "hr-director"}], [])
     assert "不要" in d1 and "create_agent 招工程师" in d1
-    # HR 视角: 缺工程师 -> HR 招
+    # HR perspective: missing engineers -> HR hires
     hr = AgentProfile(agent_id="h", name="H", role="hr-director", department="People", personality=Personality())
     d2 = SimulatedAgentRunner._directive(hr, [{"role": "ceo"}, {"role": "hr-director"}], [])
     assert "create_agent" in d2 and "senior-engineer" in d2
 
 
-# ── 真实调用 (需 LLM_LIVE_TEST=1 + 真实 key + Redis) ──
+# ── Live calls (requires LLM_LIVE_TEST=1 + real key + Redis) ──
 
 
 async def test_live_agent_tick():
@@ -358,7 +358,7 @@ async def test_live_agent_tick():
 
     hub.on_frontend_event = capture
     await hub.start()
-    await hub.clock.stop()  # 避免时钟 tick 干扰
+    await hub.clock.stop()  # avoid clock tick interference
     try:
         await hub.agent_runner._agent_tick("ceo-alex", await hub.snapshot())
         success = hub.llm_gateway.usage_today > 0

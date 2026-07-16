@@ -1,4 +1,4 @@
-"""create_task - CEO/HR 创建并派发任务 (见 §三 任务分解与分配)。"""
+"""create_task - CEO/HR creates and dispatches a task (see §三 task decomposition and assignment)."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class CreateTaskTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 调 hub.create_task
+        # TODO: call hub.create_task
         return {"status": "pending", "title": kwargs.get("title")}
 
 

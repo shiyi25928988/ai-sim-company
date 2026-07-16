@@ -1,15 +1,16 @@
-"""SimulatedAgentRunner - simulated 模式下在 Hub 内托管 Agent 主循环。
+"""SimulatedAgentRunner - hosts the Agent main loop inside the Hub in simulated mode.
 
-设计折中: simulated 模式没有真实 Agent 容器 (hermes 不可用)，因此由 Hub 进程
-为每个 simulated Agent 跑一个 tick 循环，直接 in-process 调用 LLMGateway.chat
-(等价于"走 Hub LLM Gateway")。docker 模式下 Agent 在各自容器内运行，不经过本运行器。
+Design trade-off: simulated mode has no real Agent container (hermes unavailable), so the Hub process
+runs a tick loop for each simulated Agent, calling LLMGateway.chat directly in-process
+(equivalent to "going through the Hub LLM Gateway"). In docker mode Agents run in their own containers
+and do not go through this runner.
 
-多轮工具循环 (ReAct / OpenAI tools loop):
-  每 Tick:
-    snapshot -> 组装 prompt -> [LLM.chat -> 若有 tool_calls 则执行并把结果回填 -> 再 chat]
-    重复直到无 tool_calls 或达到 max_iters。工具结果会回传给 LLM，故 web_search/
-    write_file 等可被"搜完/写完再看结果"地使用 (尽管多数工具仍是桩)。
-busy 标志避免同一 Agent 的 tick 重叠 (LLM 调用慢于 tick 间隔时跳过)。
+Multi-turn tool loop (ReAct / OpenAI tools loop):
+  Each Tick:
+    snapshot -> assemble prompt -> [LLM.chat -> if there are tool_calls, execute and feed results back -> chat again]
+    repeat until there are no tool_calls or max_iters is reached. Tool results are fed back to the LLM, so web_search/
+    write_file etc. can be used in a "search/write then look at the result" fashion (even though most tools are still stubs).
+The busy flag prevents overlapping ticks for the same Agent (skips when the LLM call is slower than the tick interval).
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ class _AgentRuntime:
 
 
 class SimulatedAgentRunner:
-    """Hub 内托管的 simulated Agent 主循环。"""
+    """The simulated Agent main loop hosted inside the Hub."""
 
     def __init__(self, hub) -> None:
         self.hub = hub
@@ -51,7 +52,7 @@ class SimulatedAgentRunner:
             t.cancel()
         self._tasks.clear()
 
-    # ── 注册 ──
+    # ── Registration ──
     def register(self, profile: AgentProfile) -> None:
         self._agents[profile.agent_id] = _AgentRuntime(
             profile=profile, memory=MemoryManager(profile.agent_id)
@@ -64,7 +65,7 @@ class SimulatedAgentRunner:
         return agent_id in self._agents
 
     def recent_memory(self, agent_id: str, limit: int = 5) -> list[dict]:
-        """某 Agent 最近的思考/动作 (供前端 AgentPanel 展示)。"""
+        """An Agent's recent thoughts/actions (for the frontend AgentPanel to display)."""
         rt = self._agents.get(agent_id)
         if not rt:
             return []
@@ -72,10 +73,10 @@ class SimulatedAgentRunner:
 
     # ── Tick ──
     async def on_tick(self, tick: int) -> None:
-        """每个仿真 Tick (播放模式): 并发派发非忙 Agent 思考 (fire-and-forget，快)。"""
+        """Each simulation Tick (play mode): concurrently dispatch non-busy Agents to think (fire-and-forget, fast)."""
         if not self._running:
             return
-        # Agent 每 N 个 tick 思考一次 (1=每次; 控成本)。hub 仍会推 snapshot/经济。
+        # Agents think every N ticks (1=every tick; cost control). The hub still pushes snapshot/economy.
         think_every = getattr(getattr(self.hub.config, "simulation", None), "agent_think_every", 1) or 1
         if think_every > 1 and tick % think_every != 0:
             return
@@ -88,10 +89,10 @@ class SimulatedAgentRunner:
             task.add_done_callback(self._tasks.discard)
 
     async def run_tick_sequential(self, tick: int) -> None:
-        """单步模式: Agent 依次思考 (顺序 + 间隔)，可观察; await 全部完成。
+        """Step mode: Agents think one by one (sequential + interval), observable; awaits all to finish.
 
-        用于 hub.step() —— 用户每点一次"单步"推进一个 tick，逐个 Agent 行动，
-        便于看清交互节奏。间隔由 AGENT_STEP_DELAY_MS 控制。
+        用于 hub.step() —— 用户每点一次"单步"        Used by hub.step() -- each time the user clicks "step" one tick advances and Agents act one by one,
+        making it easy to see the interaction rhythm. The interval is controlled by AGENT_STEP_DELAY_MS.
         """
         if not self._running:
             return
@@ -126,7 +127,7 @@ class SimulatedAgentRunner:
             tick = snapshot.get("tick", 0)
             thought = ""
 
-            # ── 多轮工具循环 ──
+            # ── Multi-turn tool loop ──
             for _ in range(max_iters):
                 resp = await self.hub.llm_gateway.chat(profile, messages, tools=profile.tools)
                 if resp.error:
@@ -139,9 +140,9 @@ class SimulatedAgentRunner:
                 if resp.content and not thought:
                     thought = resp.content
                 if not resp.tool_calls:
-                    break  # 纯文本回复，结束本轮
+                    break  # plain-text reply, end this turn
 
-                # 把 assistant 的 tool_calls 入对话，逐个执行并回填 tool 结果
+                # Add the assistant's tool_calls to the conversation, execute each and feed tool results back
                 messages.append({
                     "role": "assistant",
                     "content": resp.content or "",

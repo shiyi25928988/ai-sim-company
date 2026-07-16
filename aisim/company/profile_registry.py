@@ -1,7 +1,7 @@
-"""Agent 身份 Profile 生成与管理 (见 §四)。
+"""Agent identity Profile generation and management (see §四).
 
-新 Agent 的 system_prompt / tools / skills 在此组装后下发。
-Profile 落盘到 Redis hash (aisim:profiles)，并通过 agent:{id}:profile 下发。
+A new Agent's system_prompt / tools / skills are assembled here before being pushed.
+Profiles are persisted to a Redis hash (aisim:profiles) and pushed via agent:{id}:profile.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from aisim.shared.models import AgentProfile, Personality
 
 logger = logging.getLogger(__name__)
 
-# 角色 -> 可用工具 (见 §四 角色与工具对照表)
+# Role -> available tools (see §四 role/tool mapping table)
 TOOLS_BY_ROLE: dict[str, list[str]] = {
     "ceo": [
         "create_agent", "send_message", "call_meeting", "web_search",
@@ -38,7 +38,7 @@ TOOLS_BY_ROLE: dict[str, list[str]] = {
 
 
 def _profile_to_dict(profile: AgentProfile) -> dict:
-    """AgentProfile -> 可 JSON 序列化的 dict (含嵌套枚举/数据类)。"""
+    """AgentProfile -> a JSON-serializable dict (including nested enums/dataclasses)."""
     p = profile.__dict__.copy()
     p["personality"] = profile.personality.__dict__
     p["status"] = profile.status.value
@@ -46,15 +46,15 @@ def _profile_to_dict(profile: AgentProfile) -> dict:
 
 
 class ProfileRegistry:
-    """Agent Profile 存储与生成 (Redis)。"""
+    """Agent Profile storage and generation (Redis)."""
 
     def __init__(self, bus: MessageBus) -> None:
         self.bus = bus
         self._cache: dict[str, AgentProfile] = {}
 
-    # ── 生成 ──
+    # ── Generation ──
     def generate_ceo_profile(self, config: Config) -> AgentProfile:
-        """公司创立时生成 CEO 的 Profile。"""
+        """Generate the CEO's Profile at company founding."""
         ceo: CEOConfig = config.ceo
         return AgentProfile(
             agent_id=ceo.agent_id,
@@ -65,7 +65,7 @@ class ProfileRegistry:
             responsibilities=["公司战略", "招聘决策", "预算审批"],
             report_to="",
             salary=ceo.salary,
-            system_prompt="",  # 由 LLMGateway._build_system_prompt 动态组装
+            system_prompt="",  # assembled dynamically by LLMGateway._build_system_prompt
             tools=TOOLS_BY_ROLE.get("ceo", []),
             skills=[],
             workspace=f"/workspace/{ceo.agent_id}",
@@ -81,7 +81,7 @@ class ProfileRegistry:
         salary: int,
         report_to: str,
     ) -> AgentProfile:
-        """HR/CEO 调用 create_agent 时，生成目标 Agent 的 Profile。"""
+        """When HR/CEO call create_agent, generate the target Agent's Profile."""
         profile = AgentProfile(
             agent_id=agent_id,
             name=name,
@@ -99,7 +99,7 @@ class ProfileRegistry:
         self._cache[agent_id] = profile
         return profile
 
-    # ── Redis 存储 ──
+    # ── Redis storage ──
     async def save(self, profile: AgentProfile) -> None:
         self._cache[profile.agent_id] = profile
         await self.bus.hset_json(channels.KEY_PROFILES, profile.agent_id, _profile_to_dict(profile))
@@ -119,7 +119,7 @@ class ProfileRegistry:
         await self.bus.hdel(channels.KEY_PROFILES, agent_id)
 
     async def publish(self, profile: AgentProfile) -> None:
-        """通过 Redis 下发 Profile 到 agent:{id}:profile。"""
+        """Push the Profile to agent:{id}:profile via Redis."""
         await self.save(profile)
         await self.bus.publish(channels.agent_profile(profile.agent_id), _profile_to_dict(profile))
         logger.info("下发 Profile: %s (%s)", profile.agent_id, profile.role)

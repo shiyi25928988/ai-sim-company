@@ -1,4 +1,4 @@
-// 游戏状态类型 - 与后端 aisim.shared.models 对齐 (见 §六 前端 WS 协议)。
+// Game state types - aligned with backend aisim.shared.models (see §6 frontend WS protocol).
 
 export type AgentStatus = "booting" | "initializing" | "ready" | "working" | "offline";
 
@@ -12,7 +12,7 @@ export interface AgentState {
   energy: number; // 0 ~ 100
   x: number;
   y: number;
-  recent: { content: string; type: string }[]; // 最近的思考/动作
+  recent: { content: string; type: string }[]; // recent thoughts/actions
 }
 
 export interface EconomyState {
@@ -69,7 +69,7 @@ export type LogEntry = {
   text: string;
 };
 
-// Hub -> 前端的渲染事件 (见 §六)。字段与后端 hub.snapshot_event / emit_frontend 对齐。
+// Hub -> frontend render events (see §6). Fields align with backend hub.snapshot_event / emit_frontend.
 export type FrontendEvent =
   | { type: "agent_message"; sender: string; content: string }
   | { type: "agent_action"; agent: string; action: string; target?: string }

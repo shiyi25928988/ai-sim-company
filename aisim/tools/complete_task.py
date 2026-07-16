@@ -1,4 +1,4 @@
-"""complete_task - Agent 完成任务并汇报 (见 §三)。"""
+"""complete_task - an Agent completes a task and reports (see §三)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ class CompleteTaskTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 调 hub.complete_task
+        # TODO: call hub.complete_task
         return {"status": "done", "task_id": kwargs.get("task_id")}
 
 

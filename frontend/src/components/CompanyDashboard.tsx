@@ -1,20 +1,20 @@
 "use client";
 
-/** 公司仪表盘: 组织架构树 / 收支趋势图 / 项目看板 (TODO: 接入数据)。 */
+/** Company dashboard: org chart tree / cash-flow trend / project board (TODO: wire up data). */
 export function CompanyDashboard() {
   return (
     <div className="pixel-panel grid grid-cols-3 gap-3 p-3 text-sm">
       <section>
-        <h3 className="mb-2 font-bold">组织架构</h3>
-        <div className="text-gray-400">(待渲染 OrgChart)</div>
+        <h3 className="mb-2 font-bold">Org Chart</h3>
+        <div className="text-gray-400">(OrgChart pending)</div>
       </section>
       <section>
-        <h3 className="mb-2 font-bold">收支趋势</h3>
-        <div className="text-gray-400">(待渲染 EconomyChart)</div>
+        <h3 className="mb-2 font-bold">Cash Flow</h3>
+        <div className="text-gray-400">(EconomyChart pending)</div>
       </section>
       <section>
-        <h3 className="mb-2 font-bold">项目看板</h3>
-        <div className="text-gray-400">(待渲染 ProjectBoard)</div>
+        <h3 className="mb-2 font-bold">Project Board</h3>
+        <div className="text-gray-400">(ProjectBoard pending)</div>
       </section>
     </div>
   );

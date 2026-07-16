@@ -2,13 +2,13 @@
 
 import type { GameSnapshot } from "@/types/game";
 
-/** HUD 顶栏: 资金 / 仿真日(Tick) / 团队情绪 / 倍速。 */
+/** HUD top bar: capital / sim day (tick) / team mood / speed. */
 export function HUD({ snapshot }: { snapshot: GameSnapshot }) {
   const mood = avgMood(snapshot.agents);
   return (
     <div className="pixel-panel flex items-center gap-6 px-4 py-2 text-sm">
       <span>💰 ${snapshot.economy.capital.toLocaleString()}</span>
-      <span>💸 ${snapshot.economy.monthly_burn.toLocaleString()}/月</span>
+      <span>💸 ${snapshot.economy.monthly_burn.toLocaleString()}/mo</span>
       <span>📅 Day {Math.floor(snapshot.tick / 10) + 1}</span>
       <span>👥 {snapshot.agents.length}</span>
       <span>🧠 {snapshot.skills.length}</span>

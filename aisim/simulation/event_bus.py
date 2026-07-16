@@ -1,4 +1,4 @@
-"""事件系统 - 市场事件 / 随机事件 (见 §三 event_bus)。"""
+"""Event system - market events / random events (see §三 event_bus)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SimEvent:
-    """仿真事件。"""
+    """A simulation event."""
 
     id: str
     kind: str  # market | random | milestone | crisis
@@ -20,7 +20,7 @@ class SimEvent:
 
 
 class EventBus:
-    """市场事件与随机事件的总线。"""
+    """Bus for market events and random events."""
 
     def __init__(self) -> None:
         self._subscribers: list[Callable[[SimEvent], None]] = []
@@ -34,11 +34,11 @@ class EventBus:
             handler(event)
 
     def schedule(self, event: SimEvent) -> None:
-        """排队一个将在后续 Tick 触发的事件。"""
+        """Queue an event to be triggered in a later Tick."""
         self._queue.append(event)
 
     def drain(self) -> list[SimEvent]:
-        """取出并触发本 Tick 所有事件。"""
+        """Pop and trigger all events for this Tick."""
         events, self._queue = self._queue, []
         for e in events:
             self.emit(e)

@@ -1,6 +1,6 @@
-"""share_skill - Senior 把经验提炼成 Skill 发布给某角色 (见 §八)。
+"""share_skill - a Senior distills experience into a Skill and publishes it to a role (see §八).
 
-落地: 在公司池创建一个 ROLE 级 Skill (scope=[target_role])，该角色全员自动继承。
+Implementation: creates a ROLE-level Skill in the company pool (scope=[target_role]); all agents of that role inherit it automatically.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ class ShareSkillTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 调 hub.share_skill
+        # TODO: call hub.share_skill
         return {"status": "shared", "name": kwargs.get("name")}
 
 

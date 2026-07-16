@@ -1,4 +1,4 @@
-"""web_search - 联网搜索 (见 §四 各角色工具)。"""
+"""web_search - online search (see §四 per-role tools)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ class WebSearchTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 接入搜索 API (httpx)
+        # TODO: integrate a search API (httpx)
         return {"status": "ok", "query": kwargs.get("query"), "results": []}
 
 

@@ -1,4 +1,4 @@
-"""Database (SQLite) 单元测试。"""
+"""Database (SQLite) unit tests."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def test_save_load_json_roundtrip():
         db.save_json("k", {"a": 1, "b": [2, 3]})
         assert db.load_json("k") == {"a": 1, "b": [2, 3]}
         assert db.load_json("missing") is None
-        # 覆盖
+        # overwrite
         db.save_json("k", {"a": 2})
         assert db.load_json("k") == {"a": 2}
     finally:
@@ -30,7 +30,7 @@ def test_connect_creates_table():
     db = Database(path=path)
     db.connect()
     try:
-        # 表存在即可写入
+        # table exists, so write should succeed
         db.save_json("x", 42)
         assert db.load_json("x") == 42
     finally:

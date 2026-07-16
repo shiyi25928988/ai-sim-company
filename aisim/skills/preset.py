@@ -1,10 +1,10 @@
-"""预设 Skills - 角色 CREATE 时自带的基础技能 (见 §八 Skill 来源)。"""
+"""Preset Skills - base skills bundled with a role at CREATE time (see §八 Skill sources)."""
 
 from __future__ import annotations
 
 from aisim.shared.models import Skill, SkillCategory, SkillLevel, SkillStatus
 
-# 角色自带的基础 Skill (level=PERSONAL，新建 Agent 时克隆为个人 Skill)
+# Base Skills bundled with a role (level=PERSONAL, cloned as a personal Skill when a new Agent is created)
 PRESET_SKILLS: dict[str, list[Skill]] = {
     "senior-engineer": [
         Skill(

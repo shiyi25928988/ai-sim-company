@@ -1,8 +1,9 @@
 /**
- * 办公室 tile 地图 (见 §十 场景布局)。
+ * Office tile map (see §10 scene layout).
  *
- * 30 列 x 20 行，每格 32px = 960x640。家具 (墙/工位/会议桌/白板/植物) 是障碍物，
- * 地板可通行。提供 walkable grid 给 EasyStar 寻路；deskSlots / meetingSlot 给 Agent 站位。
+ * 30 cols x 20 rows, 32px each = 960x640. Furniture (wall/desk/meeting table/whiteboard/plant)
+ * is an obstacle; the floor is walkable. Provides a walkable grid for EasyStar pathfinding;
+ * deskSlots / meetingSlot are agent stand positions.
  */
 
 export const TILE = 32;
@@ -23,11 +24,11 @@ export class OfficeMap {
   readonly rows = ROWS;
 
   tiles: TileType[][] = [];
-  /** 寻路网格: 0=可通行, 1=障碍。 */
+  /** Pathfinding grid: 0 = walkable, 1 = obstacle. */
   grid: number[][] = [];
-  /** 工位前可站立的像素坐标 (Agent 入职落点)。 */
+  /** Pixel coords where an agent can stand in front of a desk (agent spawn point). */
   deskSlots: Point[] = [];
-  /** 会议室落点 (像素)。 */
+  /** Meeting room stand point (pixels). */
   meetingSlot: Point = { x: 0, y: 0 };
 
   constructor() {
@@ -45,7 +46,7 @@ export class OfficeMap {
       this.tiles.push(tileRow);
       this.grid.push(gridRow);
     }
-    // 外墙
+    // Outer walls
     for (let c = 0; c < COLS; c++) {
       this.place(0, c, "wall");
       this.place(ROWS - 1, c, "wall");
@@ -54,21 +55,21 @@ export class OfficeMap {
       this.place(r, 0, "wall");
       this.place(r, COLS - 1, "wall");
     }
-    // 工位区: 工位在 col [2,5,8,11] x row [2,5]，Agent 站其下一格
+    // Workstation area: desks at col [2,5,8,11] x row [2,5]; agent stands one tile below
     for (const c of [2, 5, 8, 11]) {
       for (const r of [2, 5]) {
         this.place(r, c, "desk");
         this.deskSlots.push(this.tileCenter(c, r + 1));
       }
     }
-    // 会议室: 会议桌 row 2-3 x col 18-21
+    // Meeting room: meeting table at row 2-3 x col 18-21
     for (let r = 2; r <= 3; r++) {
       for (let c = 18; c <= 21; c++) this.place(r, c, "table");
     }
     this.meetingSlot = this.tileCenter(20, 5);
-    // 白板区: row 17 x col 2-8
+    // Whiteboard area: row 17 x col 2-8
     for (let c = 2; c <= 8; c++) this.place(17, c, "whiteboard");
-    // 休闲区: 植物 row 16 x col [22,24,26]
+    // Lounge: plants at row 16 x col [22,24,26]
     for (const c of [22, 24, 26]) this.place(16, c, "plant");
   }
 

@@ -3,14 +3,14 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ai-sim-company",
-  description: "多智能体 AI 公司模拟 - 像素风办公室",
+  description: "Multi-Agent AI Company Simulation - Pixel Office",
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

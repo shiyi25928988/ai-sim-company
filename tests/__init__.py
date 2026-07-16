@@ -1,1 +1,1 @@
-"""ai-sim-company 测试包。"""
+"""ai-sim-company test package."""

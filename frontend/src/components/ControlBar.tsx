@@ -11,12 +11,12 @@ async function control(action: string, speed?: number): Promise<void> {
       body: JSON.stringify({ action, speed }),
     });
   } catch {
-    // 后端未启动时静默
+    // stay silent when the backend is down
   }
 }
 
-/** 底栏控制: 播放/暂停 / 倍速 (1x/10x/60x) / 快照。 */
-export function ControlBar() {
+/** Bottom bar controls: play/pause / speed (1x/10x/60x) / snapshot / open office. */
+export function ControlBar({ onOpenOffice }: { onOpenOffice: () => void }) {
   const [speed, setSpeed] = useState(1);
   const [playing, setPlaying] = useState(true);
 
@@ -32,17 +32,17 @@ export function ControlBar() {
   };
 
   const step = () => {
-    setPlaying(false); // 单步即暂停态
+    setPlaying(false); // stepping implies paused
     void control("step");
   };
 
   return (
     <div className="pixel-panel flex items-center justify-center gap-4 px-4 py-1 text-sm">
       <button onClick={togglePlay} className="hover:text-cyan-300">
-        {playing ? "⏸ 暂停" : "▶ 播放"}
+        {playing ? "⏸ Pause" : "▶ Play"}
       </button>
       <button onClick={step} className="hover:text-cyan-300">
-        ⏭ 单步
+        ⏭ Step
       </button>
       {[1, 10, 60].map((s) => (
         <button
@@ -54,7 +54,10 @@ export function ControlBar() {
         </button>
       ))}
       <button className="hover:text-cyan-300" onClick={() => void control("play")}>
-        📸 快照
+        📸 Snapshot
+      </button>
+      <button className="hover:text-cyan-300" onClick={onOpenOffice}>
+        🏢 Show Office
       </button>
     </div>
   );

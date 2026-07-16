@@ -1,12 +1,12 @@
-"""Agent 容器编排 - 通过 Docker API 创建/停止/删除 Agent 容器 (见 §四/§五)。
+"""Agent container orchestration - create/stop/delete Agent containers via the Docker API (see §四/§五).
 
-两种后端:
-- docker:    真实 docker run (aiodocker)，env 仅 REDIS_URL+AGENT_ID，挂载私有+共享 workspace。
-             Agent 容器启动后自行经 Redis 报到 -> Hub 下发 Profile。
-- simulated: 本地开发默认。不启动容器，直接在 Redis 登记运行态，便于无 hermes/Docker 时
-             完整演练 Hub 接口与前端。
+Two backends:
+- docker:    real docker run (aiodocker); env is only REDIS_URL+AGENT_ID; mounts private + shared workspace.
+             The Agent container reports in over Redis on its own after starting -> the Hub pushes its Profile.
+- simulated: default for local dev. Does not start a container; registers runtime state directly in Redis,
+             so the Hub interface and frontend can be fully exercised without hermes/Docker.
 
-Agent 运行态落盘到 Redis hash (aisim:agents)。
+Agent runtime state is persisted to a Redis hash (aisim:agents).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 AGENT_IMAGE = "ai-sim-company-agent:latest"
 NETWORK = "ai-sim-company_aisim-net"
-HEARTBEAT_TIMEOUT_S = 15.0  # 心跳超时 -> 判定 OFFLINE
+HEARTBEAT_TIMEOUT_S = 15.0  # heartbeat timeout -> marked OFFLINE
 
 
 @dataclass
@@ -37,7 +37,7 @@ class AgentHandle:
 
 
 class AgentManager:
-    """Agent 生命周期管理 + 运行态存储 (Redis)。"""
+    """Agent lifecycle management + runtime state storage (Redis)."""
 
     def __init__(self, bus: MessageBus) -> None:
         self.bus = bus
@@ -49,7 +49,7 @@ class AgentManager:
         self.mode = config.agent_backend
         if self.mode == "docker":
             try:
-                import aiodocker  # noqa: F401 延迟导入
+                import aiodocker  # noqa: F401 lazy import
                 import os
 
                 docker_host = os.environ.get("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -61,7 +61,7 @@ class AgentManager:
                 self.mode = "simulated"
         logger.info("AgentManager: %s 模式", self.mode)
 
-    # ── 运行态存储 (Redis) ──
+    # ── Runtime state storage (Redis) ──
     async def register(self, profile: AgentProfile, status: AgentStatus, simulated: bool) -> None:
         state = self._state_from(profile, status, simulated)
         self._handles[profile.agent_id] = AgentHandle(
@@ -97,11 +97,11 @@ class AgentManager:
         self._handles.pop(agent_id, None)
         await self.bus.hdel(channels.KEY_AGENTS, agent_id)
 
-    # ── 创建 / 销毁容器 ──
+    # ── Create / destroy containers ──
     async def create_container(
         self, agent_id: str, redis_url: str, memory: str = "256m", cpus: float = 0.5
     ) -> AgentHandle:
-        """docker 模式: docker run 一个新 Agent 容器。"""
+        """docker mode: docker run a new Agent container."""
         mem_bytes = _parse_memory(memory)
         config = {
             "Image": AGENT_IMAGE,
@@ -127,7 +127,7 @@ class AgentManager:
         return handle
 
     async def remove_container(self, agent_id: str) -> None:
-        """docker 模式: 停止并删除容器。"""
+        """docker mode: stop and remove the container."""
         handle = self._handles.get(agent_id)
         if handle and handle.container_id and self._docker is not None:
             try:
@@ -139,13 +139,13 @@ class AgentManager:
                 logger.exception("销毁容器失败: %s", agent_id)
 
     async def remove(self, agent_id: str) -> None:
-        """统一销毁 (docker 模式停容器 + 删 Redis 状态)。"""
+        """Unified teardown (stop container in docker mode + delete Redis state)."""
         await self.remove_container(agent_id)
         await self.remove_state(agent_id)
 
-    # ── 心跳超时检查 ──
+    # ── Heartbeat timeout check ──
     async def mark_stale_offline(self) -> list[str]:
-        """返回被判定 OFFLINE 的 agent_id 列表 (跳过 simulated)。"""
+        """Return the list of agent_ids judged OFFLINE (skips simulated ones)."""
         agents = await self.list()
         now = time.time()
         stale: list[str] = []
@@ -158,7 +158,7 @@ class AgentManager:
                 stale.append(state["agent_id"])
         return stale
 
-    # ── 工具 ──
+    # ── Utilities ──
     @staticmethod
     def _state_from(profile: AgentProfile, status: AgentStatus, simulated: bool) -> dict:
         return {
@@ -178,7 +178,7 @@ class AgentManager:
 
 
 def _parse_memory(spec: str) -> int:
-    """'256m' / '1g' -> bytes。"""
+    """'256m' / '1g' -> bytes."""
     spec = spec.strip().lower()
     try:
         if spec.endswith("g"):

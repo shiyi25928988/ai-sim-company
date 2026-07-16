@@ -1,4 +1,4 @@
-"""会议系统测试 - 用 FakeGateway (无真实 LLM)。"""
+"""Meeting system tests - uses FakeGateway (no real LLM)."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ async def test_meeting_run_produces_minutes():
     assert meeting.status == "ended"
     assert meeting.minutes == minutes
     assert len(gw.calls) == 1
-    # prompt 应含主题与参会者
+    # prompt should contain topic and participants
     prompt = gw.calls[0]["messages"][0]["content"]
     assert "Q2 规划" in prompt and "Sarah" in prompt
 

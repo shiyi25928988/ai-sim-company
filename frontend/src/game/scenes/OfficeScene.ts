@@ -6,7 +6,7 @@ import { OfficeMap, TILE, type Point } from "../map/OfficeMap";
 import { gameBridge } from "../bridge";
 import type { AgentState, FrontendEvent } from "@/types/game";
 
-// 角色 -> 身体配色
+// Role -> body color
 const ROLE_COLORS: Record<string, number> = {
   ceo: 0xffd700,
   "hr-director": 0xff6b9d,
@@ -16,7 +16,7 @@ const ROLE_COLORS: Record<string, number> = {
 };
 const DEFAULT_COLOR = 0x66ccff;
 
-// 家具配色
+// Furniture colors
 const TILE_COLORS: Record<string, number> = {
   wall: 0x3a3a5c,
   desk: 0x8a5a2b,
@@ -25,8 +25,8 @@ const TILE_COLORS: Record<string, number> = {
   plant: 0x2e8b57,
 };
 
-/** 办公室主场景: tile 地板 + 家具 + Agent 像素小人 + 寻路移动。
- * 订阅 gameBridge 的 WS 事件来增删精灵、显示气泡、走到会议室。 */
+/** Main office scene: tile floor + furniture + agent pixel sprites + pathfinding movement.
+ * Subscribes to gameBridge WS events to add/remove sprites, show bubbles, and walk to the meeting room. */
 export class OfficeScene extends Phaser.Scene {
   private officeMap = new OfficeMap();
   private pathfinder?: PathFinder;
@@ -70,7 +70,7 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
-  /** 用快照里的 Agent 列表增删精灵。 */
+  /** Add/remove sprites based on the snapshot's agent list. */
   private reconcile(agents: AgentState[]): void {
     const names = new Set(agents.map((a) => a.name));
     for (const a of agents) {
@@ -94,13 +94,13 @@ export class OfficeScene extends Phaser.Scene {
     sprite.setColor(ROLE_COLORS[role] ?? DEFAULT_COLOR);
     this.add.existing(sprite);
     this.agents.set(name, sprite);
-    // 入场动画
+    // Entrance animation
     sprite.setScale(0);
     this.tweens.add({ targets: sprite, scale: 1, duration: 300, ease: "Back.out" });
     return sprite;
   }
 
-  /** 在精灵头顶显示对话气泡，4s 后淡出。 */
+  /** Show a speech bubble above the sprite's head; fades out after 4s. */
   private showBubble(name: string, content: string): void {
     const sprite = this.agents.get(name);
     if (!sprite) return;
@@ -128,7 +128,7 @@ export class OfficeScene extends Phaser.Scene {
     });
   }
 
-  /** 参会者沿网格路径走到会议室。 */
+  /** Walk participants along the grid path to the meeting room. */
   private async moveToMeeting(participants: string[]): Promise<void> {
     if (!this.pathfinder) return;
     const to = this.officeMap.pixelToTile(this.officeMap.meetingSlot.x, this.officeMap.meetingSlot.y);
@@ -142,7 +142,7 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
-  /** 用单个 Graphics 画出 tile 地板 + 家具 (高效)。 */
+  /** Draw the tile floor + furniture with a single Graphics object (efficient). */
   private drawOffice(): void {
     const g = this.add.graphics();
     const T = TILE;
@@ -151,7 +151,7 @@ export class OfficeScene extends Phaser.Scene {
         const type = this.officeMap.tiles[r][c];
         const x = c * T;
         const y = r * T;
-        // 地板 (棋盘格)
+        // Floor (checkerboard)
         const shade = (c + r) % 2 === 0 ? 0x1a1a2e : 0x161627;
         g.fillStyle(shade, 1);
         g.fillRect(x, y, T, T);
@@ -160,25 +160,25 @@ export class OfficeScene extends Phaser.Scene {
           g.fillStyle(color, 1);
           g.fillRect(x + 1, y + 1, T - 2, T - 2);
           if (type === "desk") {
-            g.fillStyle(0xa9743f, 1); // 桌面高光
+            g.fillStyle(0xa9743f, 1); // desktop highlight
             g.fillRect(x + 4, y + 6, T - 8, 5);
           } else if (type === "plant") {
-            g.fillStyle(0x6b3f1f, 1); // 花盆
+            g.fillStyle(0x6b3f1f, 1); // pot
             g.fillRect(x + T / 2 - 4, y + T - 12, 8, 8);
           } else if (type === "whiteboard") {
-            g.fillStyle(0x888899, 1); // 边框
+            g.fillStyle(0x888899, 1); // frame
             g.lineStyle(2, 0x888899);
             g.strokeRect(x + 1, y + 1, T - 2, T - 2);
           }
         }
       }
     }
-    // 区域标签
+    // Zone labels
     const label = (x: number, y: number, t: string) =>
       this.add.text(x, y, t, { fontSize: "10px", color: "#6b7280" });
-    label(40, 36, "工位区");
-    label(18 * T + 8, 36, "会议室");
-    label(40, 15 * T, "白板区");
-    label(22 * T, 14 * T, "休闲区");
+    label(40, 36, "Workstations");
+    label(18 * T + 8, 36, "Meeting Room");
+    label(40, 15 * T, "Whiteboard");
+    label(22 * T, 14 * T, "Lounge");
   }
 }

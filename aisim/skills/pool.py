@@ -1,13 +1,13 @@
-"""Company Skill Pool - 公司级知识资产 (见 §八)。
+"""Company Skill Pool - company-level knowledge assets (see §八).
 
-Redis hash (aisim:skills) 存储。Agent 按 level 继承:
-  COMPANY -> 全员; DEPARTMENT -> 同部门 (scope 含部门名);
-  ROLE -> 同角色 (scope 含角色名); PERSONAL -> 仅 scope 中的 agent_id。
-`prompt_injection` 由 LLMGateway 注入到 Agent 的 System Prompt。
+Stored in a Redis hash (aisim:skills). Agents inherit by level:
+  COMPANY -> everyone; DEPARTMENT -> same department (scope contains the department name);
+  ROLE -> same role (scope contains the role name); PERSONAL -> only the agent_id in scope.
+`prompt_injection` is injected into the Agent's System Prompt by the LLMGateway.
 
-职责分工: Hermes (Agent 容器内) 负责"学"(自动提取经验)；本 Pool 负责"管"
-(共享/分发/权限/版本)。当前 simulated 模式无 hermes，故用 share_skill/learn_skill
-工具 + 预设 Skills 来驱动 Pool 增长与继承。
+Division of responsibility: Hermes (inside the Agent container) is responsible for "learning" (auto-extracting experience); this Pool is responsible for "managing"
+(sharing/distribution/permissions/versioning). Currently there is no hermes in simulated mode, so the share_skill/learn_skill
+tools + preset Skills drive Pool growth and inheritance.
 """
 
 from __future__ import annotations
@@ -49,12 +49,12 @@ def _from_dict(data: dict) -> Skill:
 
 
 class SkillPool:
-    """公司级 Skill 池 (Redis)。"""
+    """Company-level Skill pool (Redis)."""
 
     def __init__(self, bus: MessageBus) -> None:
         self.bus = bus
 
-    # ── CRUD + 生命周期 ──
+    # ── CRUD + lifecycle ──
     async def create(self, skill: Skill) -> Skill:
         await self._save(skill)
         logger.info("新 Skill: %s (level=%s) by %s", skill.name, skill.level.value, skill.created_by)
@@ -82,7 +82,7 @@ class SkillPool:
         return [_to_dict(s) for s in await self.list()]
 
     async def search(self, query: str) -> list[Skill]:
-        """关键词检索 (TODO: FTS5；MVP 用 name/description 子串)。"""
+        """Keyword search (TODO: FTS5; MVP uses name/description substring)."""
         q = (query or "").lower()
         out = []
         for s in await self.list():
@@ -92,11 +92,11 @@ class SkillPool:
                 out.append(s)
         return out
 
-    # ── 继承 ──
+    # ── Inheritance ──
     async def get_effective_skills(
         self, agent_id: str, role: str, department: str
     ) -> list[Skill]:
-        """某 Agent 当前生效的 Skills (供 System Prompt 注入)。"""
+        """The Skills currently in effect for an Agent (for System Prompt injection)."""
         out = []
         for s in await self.list():
             if s.status != SkillStatus.PUBLISHED:
@@ -112,7 +112,7 @@ class SkillPool:
         return out
 
     async def seed_presets(self) -> int:
-        """启动时把预设 Skills 灌入池 (幂等: 已存在则跳过)。"""
+        """Seed preset Skills into the pool at startup (idempotent: skip if already exists)."""
         from aisim.skills.preset import PRESET_SKILLS
 
         count = 0
@@ -133,7 +133,7 @@ class SkillPool:
 async def onboard_agent(
     pool: SkillPool, agent_id: str, role: str, department: str
 ) -> list[Skill]:
-    """新 Agent 入职: 计算继承的 Skills (见 §八)。"""
+    """New Agent onboarding: compute inherited Skills (see §八)."""
     skills = await pool.get_effective_skills(agent_id, role, department)
     logger.info("Agent %s 入职继承 %d 个 Skills", agent_id, len(skills))
     return skills

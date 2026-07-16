@@ -1,4 +1,4 @@
-"""LLM 统一网关子包 (见 §七)。
+"""Unified LLM gateway subpackage (see §七).
 
-API Key 只在 Company Hub 配一次; Agent 不感知自己用什么模型。
+The API Key is configured once in Company Hub; Agents are unaware which model serves them.
 """

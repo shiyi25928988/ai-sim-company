@@ -16,8 +16,8 @@ const EMPTY_SNAPSHOT: GameSnapshot = {
 };
 
 /**
- * 维护前端整体游戏状态: 快照 + 日志流 + 选中的 Agent。
- * WS 事件同时喂给 React (HUD/日志) 与 gameBridge (Phaser 精灵)。
+ * Maintains the overall frontend game state: snapshot + log stream + selected agent.
+ * WS events are fed to both React (HUD/logs) and gameBridge (Phaser sprites).
  */
 export function useGameState() {
   const [snapshot, setSnapshot] = useState<GameSnapshot>(EMPTY_SNAPSHOT);
@@ -28,7 +28,7 @@ export function useGameState() {
     setLogs((prev) => [...prev.slice(-200), { ts: Date.now(), text }]);
   }, []);
 
-  // 挂载时拉取一次初始状态 (不必等首个 tick)
+  // Fetch the initial state once on mount (no need to wait for the first tick)
   useEffect(() => {
     fetch(`${API_URL}/api/state`)
       .then((r) => r.json())
@@ -39,7 +39,7 @@ export function useGameState() {
       .catch(() => {});
   }, []);
 
-  // Phaser 点击 Agent -> 选中
+  // Phaser agent click -> select
   useEffect(() => {
     return gameBridge.onSelect((name) => {
       if (!name) {
@@ -54,7 +54,7 @@ export function useGameState() {
   }, []);
 
   useWebSocket((event) => {
-    gameBridge.emit(event); // 转发给 Phaser
+    gameBridge.emit(event); // forward to Phaser
 
     switch (event.type) {
       case "state_snapshot": {
@@ -74,22 +74,22 @@ export function useGameState() {
         pushLog(`${event.sender}: ${event.content}`);
         break;
       case "agent_created":
-        pushLog(`新员工入职: ${event.name} (${event.role})`);
+        pushLog(`New hire: ${event.name} (${event.role})`);
         break;
       case "agent_action":
         pushLog(`${event.agent} -> ${event.action}${event.target ? " -> " + event.target : ""}`);
         break;
       case "meeting_start":
-        pushLog(`会议开始: ${event.participants.join(", ")}`);
+        pushLog(`Meeting started: ${event.participants.join(", ")}`);
         break;
       case "meeting_minutes":
-        pushLog(`👥 会议[${event.topic}] 纪要: ${event.minutes.slice(0, 80)}`);
+        pushLog(`👥 Minutes [${event.topic}]: ${event.minutes.slice(0, 80)}`);
         break;
       case "task_created":
-        pushLog(`📝 新任务: ${event.title} -> ${event.assignee_role || event.assignee}`);
+        pushLog(`📝 New task: ${event.title} -> ${event.assignee_role || event.assignee}`);
         break;
       case "task_completed":
-        pushLog(`✅ 完成: ${event.title} (by ${event.by})`);
+        pushLog(`✅ Done: ${event.title} (by ${event.by})`);
         break;
     }
   });

@@ -3,7 +3,7 @@
 import type { LogEntry } from "@/types/game";
 import { useEffect, useRef } from "react";
 
-/** 底栏实时日志流。 */
+/** Bottom real-time log stream. */
 export function LogFeed({ logs }: { logs: LogEntry[] }) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -13,7 +13,7 @@ export function LogFeed({ logs }: { logs: LogEntry[] }) {
 
   return (
     <div className="pixel-panel mx-auto h-24 max-w-5xl overflow-y-auto px-3 py-1 text-xs">
-      {logs.length === 0 && <div className="text-gray-500">等待公司运转…</div>}
+      {logs.length === 0 && <div className="text-gray-500">Waiting for company activity…</div>}
       {logs.map((log, i) => (
         <div key={i} className="whitespace-pre-wrap">
           <span className="text-gray-500">[{new Date(log.ts).toLocaleTimeString()}]</span>{" "}

@@ -1,4 +1,4 @@
-// easystarjs 没有官方类型声明，这里给出最小可用声明。
+// easystarjs has no official type declarations; this provides a minimal usable declaration.
 declare module "easystarjs" {
   export class js {
     setGrid(grid: number[][]): void;

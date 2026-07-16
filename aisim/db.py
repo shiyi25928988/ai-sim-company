@@ -1,8 +1,9 @@
-"""SQLite 持久化 - 见架构设计文档 §十三 (aisim/db.py)。
+"""SQLite persistence - see architecture design doc §十三 (aisim/db.py).
 
-用 key-value 表保存 Hub 的易失状态 (tick / 经济 / LLM 用量)，使 Hub 进程重启后
-能恢复进度。Agent/Task/Skill 等热状态走 Redis (Redis AOF 已持久化)，这里只补
-Hub 内存态。同步 sqlite3 (调用频次低，每 tick 一次)。
+Uses a key-value table to persist the Hub's volatile state (tick / economy / LLM usage)
+so the Hub process can resume progress after restart. Hot state such as Agent/Task/Skill
+lives in Redis (Redis AOF already persists it); this only supplements the Hub's in-memory
+state. Synchronous sqlite3 (low call frequency, once per tick).
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ DEFAULT_DB_PATH = "data/aisim.db"
 
 
 class Database:
-    """SQLite key-value 状态存储。"""
+    """SQLite key-value state store."""
 
     def __init__(self, path: str | Path = DEFAULT_DB_PATH) -> None:
         self.path = Path(path)
@@ -31,7 +32,7 @@ class Database:
         self._conn.commit()
 
     def save_json(self, key: str, value: Any) -> None:
-        """upsert 一个 JSON 值。"""
+        """Upsert a JSON value."""
         if self._conn is None:
             return
         self._conn.execute(

@@ -1,7 +1,7 @@
-"""核心数据模型 - 见架构设计文档 §四 / §六 / §八。
+"""Core data models - see architecture design doc §四 / §六 / §八.
 
-这些 dataclass / enum 是 Hub 与 Agent 之间通过 Redis 传递的契约，
-字段命名与文档保持一致，序列化为 JSON 时直接作为 dict 传输。
+These dataclasses / enums are the contract passed between Hub and Agent via Redis.
+Field names match the doc and are serialized to JSON as dicts directly.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from enum import Enum
 
 
 class AgentStatus(str, Enum):
-    """Agent 生命周期状态 (见 §四 状态机)。"""
+    """Agent lifecycle states (see §四 state machine)."""
 
     BOOTING = "booting"
     INITIALIZING = "initializing"
@@ -28,7 +28,7 @@ class AgentStatus(str, Enum):
 
 @dataclass
 class Personality:
-    """Big-5 人格特质，各维度 0.0~1.0。"""
+    """Big-5 personality traits, each dimension 0.0~1.0."""
 
     openness: float = 0.5
     conscientiousness: float = 0.5
@@ -47,10 +47,10 @@ _PERSONALITY_KEY_MAP = {
 
 
 def personality_from_dict(personality: "Personality | dict | None") -> "Personality":
-    """容错地把 dict 转 Personality。
+    """Fault-tolerantly convert a dict to Personality.
 
-    LLM 可能用全名 (openness) 或 Big-5 简写 (O/C/E/A/N) 作 key，且可能带多余字段；
-    这里统一映射并忽略未知 key。
+    The LLM may use full names (openness) or Big-5 shorthand (O/C/E/A/N) as keys, and may include extra fields;
+    here we map uniformly and ignore unknown keys.
     """
     if isinstance(personality, Personality):
         return personality
@@ -70,9 +70,9 @@ def personality_from_dict(personality: "Personality | dict | None") -> "Personal
 
 @dataclass
 class AgentProfile:
-    """Agent 的完整身份 - 由 Company Hub 下发 (见 §四)。
+    """The Agent's full identity - pushed by Company Hub (see §四).
 
-    Agent 不携带 LLM 配置; LLM 调用全部走 Hub 网关。
+    The Agent carries no LLM config; all LLM calls go through the Hub gateway.
     """
 
     agent_id: str  # "eng-jordan"
@@ -80,35 +80,35 @@ class AgentProfile:
     role: str  # "senior-engineer"
     department: str  # "Engineering"
 
-    # 人格
+    # Personality
     personality: Personality = field(default_factory=Personality)
 
-    # 职责
+    # Responsibilities
     responsibilities: list[str] = field(default_factory=list)
-    report_to: str = ""  # 汇报给谁 (agent_id)
+    report_to: str = ""  # Who they report to (agent_id)
     salary: int = 0
 
-    # 能力
-    system_prompt: str = ""  # 当前 Tick 的完整 System Prompt
-    tools: list[str] = field(default_factory=list)  # 根据角色分配
-    skills: list[str] = field(default_factory=list)  # 继承的 Skill ID 列表
+    # Capabilities
+    system_prompt: str = ""  # Full System Prompt for the current Tick
+    tools: list[str] = field(default_factory=list)  # Assigned by role
+    skills: list[str] = field(default_factory=list)  # Inherited Skill ID list
 
-    # 状态
+    # State
     mood: float = 0.0  # -1.0 ~ 1.0
     energy: float = 100.0  # 0 ~ 100
     status: AgentStatus = AgentStatus.BOOTING
 
-    # 资源
+    # Resources
     workspace: str = ""  # /workspace/eng-jordan
 
 
 # ═══════════════════════════════════════════════════════════
-# 消息
+# Message
 # ═══════════════════════════════════════════════════════════
 
 
 class MessageType(str, Enum):
-    """四种通信模式 (见 §六)。"""
+    """Four communication modes (see §六)."""
 
     DM = "dm"  # 1:1
     CHANNEL = "channel"  # 1:N
@@ -133,16 +133,16 @@ class Priority(str, Enum):
 
 @dataclass
 class Message:
-    """Agent 间通信的统一格式 (见 §六)。"""
+    """Unified format for inter-Agent communication (see §六)."""
 
     id: str
     type: MessageType
     sender: str  # agent_id
-    recipients: list[str]  # 目标 agent_id 列表
+    recipients: list[str]  # Target agent_id list
     content: str
     content_type: ContentType = ContentType.TEXT
-    channel: str | None = None  # 频道名 (type=channel 时)
-    reply_to: str | None = None  # 回复的消息 ID
+    channel: str | None = None  # Channel name (when type=channel)
+    reply_to: str | None = None  # ID of the message being replied to
     priority: Priority = Priority.NORMAL
     timestamp: float = 0.0
 
@@ -160,16 +160,16 @@ class SkillCategory(str, Enum):
 
 
 class SkillLevel(str, Enum):
-    """Skill 继承层级 (见 §八)。"""
+    """Skill inheritance levels (see §八)."""
 
-    COMPANY = "company"  # 全员继承
-    DEPARTMENT = "department"  # 部门继承
-    ROLE = "role"  # 同角色继承
-    PERSONAL = "personal"  # 仅自己
+    COMPANY = "company"  # Inherited by everyone
+    DEPARTMENT = "department"  # Inherited by department
+    ROLE = "role"  # Inherited by same role
+    PERSONAL = "personal"  # Only self
 
 
 class SkillStatus(str, Enum):
-    """Skill 生命周期状态 (见 §八)。"""
+    """Skill lifecycle states (see §八)."""
 
     DRAFT = "draft"
     PUBLISHED = "published"
@@ -179,20 +179,20 @@ class SkillStatus(str, Enum):
 
 @dataclass
 class Skill:
-    """公司级 Skill (见 §八)。
+    """Company-level Skill (see §八).
 
-    `prompt_injection` 是注入到 Agent System Prompt 的核心内容。
+    `prompt_injection` is the core content injected into the Agent's System Prompt.
     """
 
     id: str
-    name: str  # "生产环境部署 Checklist"
+    name: str  # "Production deployment checklist"
     category: SkillCategory
     level: SkillLevel
-    scope: list[str] = field(default_factory=list)  # 谁能用: ["senior-engineer", ...]
+    scope: list[str] = field(default_factory=list)  # Who can use it: ["senior-engineer", ...]
     description: str = ""
-    prompt_injection: str = ""  # ★ 注入到 System Prompt
-    created_by: str = ""  # 哪个 Agent 创建的
-    created_from: str | None = None  # 从哪个任务中学到的
+    prompt_injection: str = ""  # ★ Injected into the System Prompt
+    created_by: str = ""  # Which Agent created it
+    created_from: str | None = None  # Learned from which task
     usage_count: int = 0
     rating: float = 0.0
     status: SkillStatus = SkillStatus.DRAFT
@@ -201,7 +201,7 @@ class Skill:
 
 
 # ═══════════════════════════════════════════════════════════
-# 任务
+# Task
 # ═══════════════════════════════════════════════════════════
 
 
@@ -214,18 +214,18 @@ class TaskStatus(str, Enum):
 
 @dataclass
 class Task:
-    """一个工作任务 (CEO/HR 创建，分配给某角色或具体 Agent)。"""
+    """A work task (created by CEO/HR, assigned to a role or a specific Agent)."""
 
     id: str
     title: str
     description: str = ""
     status: TaskStatus = TaskStatus.PENDING
-    assignee: str = ""  # agent_id (空=按角色认领)
-    assignee_role: str = ""  # 角色 (派给该角色的任一 Agent)
+    assignee: str = ""  # agent_id (empty = claim by role)
+    assignee_role: str = ""  # Role (dispatched to any Agent of this role)
     project: str = ""
     priority: str = "normal"  # low | normal | high
     created_by: str = ""
     created_tick: int = 0
     completed_tick: int = 0
     completed_by: str = ""
-    result: str = ""  # 完成时的汇报
+    result: str = ""  # Report on completion

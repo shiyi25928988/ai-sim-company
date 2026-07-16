@@ -1,5 +1,5 @@
-// 前端运行时配置 - 后端 API / WebSocket 地址。
-// 本地开发默认 localhost:8000; docker compose 通过 NEXT_PUBLIC_* 注入。
+// Frontend runtime config - backend API / WebSocket URLs.
+// Local dev defaults to localhost:8000; docker compose injects via NEXT_PUBLIC_*.
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";

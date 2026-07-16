@@ -1,4 +1,4 @@
-"""call_meeting - 发起会议 (见 §六 Meeting N:N)。"""
+"""call_meeting - start a meeting (see §六 Meeting N:N)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class CallMeetingTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: MeetingSystem.schedule -> 通知前端 meeting_start -> run
+        # TODO: MeetingSystem.schedule -> notify frontend meeting_start -> run
         return {
             "status": "scheduled",
             "topic": kwargs.get("topic"),

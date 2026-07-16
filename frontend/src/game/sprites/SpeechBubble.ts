@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-/** Agent 头顶对话气泡 (见 §十 💬 气泡)。 */
+/** Speech bubble above an agent's head (see §10 💬 bubble). */
 export class SpeechBubble extends Phaser.GameObjects.Container {
   private readonly background: Phaser.GameObjects.Graphics;
   private readonly text: Phaser.GameObjects.Text;

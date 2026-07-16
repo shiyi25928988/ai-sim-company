@@ -1,7 +1,7 @@
-"""骨架冒烟测试 - 验证核心契约可导入且自洽。
+"""Skeleton smoke tests - verify core contracts are importable and self-consistent.
 
-刻意只覆盖无外部依赖 (redis / fastapi / hermes / pyyaml) 的模块，
-保证在依赖未安装时仍能运行 `pytest`。
+Intentionally only covers modules with no external dependencies (redis / fastapi / hermes / pyyaml),
+ensuring `pytest` can still run when dependencies are not installed.
 """
 
 from __future__ import annotations
@@ -32,19 +32,19 @@ from aisim.skills.preset import PRESET_SKILLS
 
 
 def test_personality_from_dict_tolerant():
-    # Big-5 简写 key (LLM 常返回) + 多余字段
+    # Big-5 shorthand keys (LLM often returns) + extra fields
     p = personality_from_dict({"O": 0.9, "C": 0.8, "E": 0.7, "A": 0.6, "N": 0.3, "extra": 1})
     assert p.openness == 0.9
     assert p.neuroticism == 0.3
-    # 全名 key
+    # full-name keys
     p2 = personality_from_dict({"openness": 0.5, "conscientiousness": 0.4})
     assert p2.openness == 0.5 and p2.conscientiousness == 0.4
-    # None / 非法值回退默认
+    # None / illegal values fall back to defaults
     assert personality_from_dict(None) == Personality()
     assert personality_from_dict({"openness": "not-a-number"}).openness == 0.5
 
 
-# ── 共享模型 ──
+# ── Shared models ──
 
 
 def test_agent_profile_defaults():
@@ -78,7 +78,7 @@ def test_message_types():
     assert m.type == MessageType.DM
 
 
-# ── 通道命名 ──
+# ── Channel naming ──
 
 
 def test_channel_helpers():
@@ -88,7 +88,7 @@ def test_channel_helpers():
     assert channels.AGENT_REGISTER == "agent:register"
 
 
-# ── 仿真: 时钟 / 经济 / 事件 ──
+# ── Simulation: clock / economy / events ──
 
 
 @pytest.mark.asyncio
@@ -125,7 +125,7 @@ def test_event_bus_drain():
     assert len(seen) == 1
 
 
-# ── 组织架构 ──
+# ── Org chart ──
 
 
 def test_org_chart_reports():
@@ -138,7 +138,7 @@ def test_org_chart_reports():
     assert org.direct_reports("ceo-alex") == []
 
 
-# ── Agent 记忆 ──
+# ── Agent memory ──
 
 
 def test_memory_recall():
@@ -150,7 +150,7 @@ def test_memory_recall():
     assert recent[-1].content == "修复 bug"
 
 
-# ── 预设 Skills ──
+# ── Preset skills ──
 
 
 def test_preset_skills_for_engineer():
@@ -160,7 +160,7 @@ def test_preset_skills_for_engineer():
     assert all(s.status == SkillStatus.PUBLISHED for s in skills)
 
 
-# ── 工具注册 (导入 aisim.tools 触发全部注册) ──
+# ── Tool registration (importing aisim.tools triggers all registration) ──
 
 
 def test_tools_registered():

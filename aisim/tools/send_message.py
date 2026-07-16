@@ -1,4 +1,4 @@
-"""send_message - Agent 间通信 (见 §六 四种通信模式)。"""
+"""send_message - inter-Agent communication (see §六 four communication modes)."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class SendMessageTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 构造 Message 并经 MessageBus 投递
+        # TODO: construct a Message and deliver it via MessageBus
         return {"status": "sent", "content": kwargs.get("content")}
 
 

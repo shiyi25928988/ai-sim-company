@@ -1,1 +1,1 @@
-"""仿真引擎子包 (见 §三 仿真组件)。"""
+"""Simulation engine subpackage (see §三 simulation components)."""

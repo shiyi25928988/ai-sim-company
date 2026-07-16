@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-/** 会议室特写场景 (会议进行时切入)。 */
+/** Meeting room close-up scene (switched to while a meeting is in progress). */
 export class MeetingScene extends Phaser.Scene {
   constructor() {
     super("MeetingScene");
@@ -8,11 +8,11 @@ export class MeetingScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor("#15152a");
-    this.add.text(480, 80, "会议进行中…", {
+    this.add.text(480, 80, "Meeting in progress…", {
       fontSize: "24px",
       color: "#fff",
     }).setOrigin(0.5);
 
-    // TODO: 排列参会者座位 + 显示实时发言气泡
+    // TODO: arrange participant seats + show real-time speech bubbles
   }
 }

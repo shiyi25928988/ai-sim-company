@@ -1,8 +1,9 @@
-// React <-> Phaser 的事件桥。
+// React <-> Phaser event bridge.
 //
-// useGameState 把 WS 事件转发到这里 (emit)，OfficeScene 订阅 (onEvent) 来
-// 增删/移动精灵、显示气泡。反向: 点击精灵 -> select(name) -> React 选中该 Agent。
-// 用单例而非 props 透传，因为 Phaser 场景不在 React 树内。
+// useGameState forwards WS events here (emit); OfficeScene subscribes (onEvent) to
+// add/remove/move sprites and show bubbles. Reverse: sprite click -> select(name) ->
+// React selects that agent.
+// Uses a singleton rather than prop drilling, because Phaser scenes live outside the React tree.
 
 import type { FrontendEvent, GameSnapshot } from "@/types/game";
 
@@ -10,13 +11,13 @@ type EventHandler = (event: FrontendEvent) => void;
 type SelectHandler = (name: string | null) => void;
 
 class GameBridge {
-  /** 最近一次快照 (供后挂载的 OfficeScene 立即渲染已有 Agent)。 */
+  /** Most recent snapshot (lets a late-mounted OfficeScene render existing agents immediately). */
   snapshot: GameSnapshot | null = null;
 
   private eventHandlers = new Set<EventHandler>();
   private selectHandlers = new Set<SelectHandler>();
 
-  // WS 事件 -> Phaser
+  // WS events -> Phaser
   onEvent(handler: EventHandler): () => void {
     this.eventHandlers.add(handler);
     return () => this.eventHandlers.delete(handler);
@@ -26,7 +27,7 @@ class GameBridge {
     this.eventHandlers.forEach((h) => h(event));
   }
 
-  // Phaser 点击 -> React
+  // Phaser click -> React
   onSelect(handler: SelectHandler): () => void {
     this.selectHandlers.add(handler);
     return () => this.selectHandlers.delete(handler);

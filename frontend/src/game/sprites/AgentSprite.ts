@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { gameBridge } from "../bridge";
 
-/** Agent 精灵动画状态机 (见 §十): IDLE -> WALKING -> WORKING -> TALKING。 */
+/** Agent sprite animation state machine (see §10): IDLE -> WALKING -> WORKING -> TALKING. */
 export enum AgentAnimState {
   Idle = "idle",
   Walking = "walking",
@@ -10,9 +10,10 @@ export enum AgentAnimState {
 }
 
 /**
- * Agent 像素小人: 头 + 身体 (角色配色) + 名牌。
- * 容器 (this) 由 walkPath 移动；内部 char 容器做呼吸/走路 bob 动画 (互不冲突)。
- * 点击 -> gameBridge.select(name) -> React 选中。
+ * Agent pixel character: head + body (role-colored) + name tag.
+ * The container (this) is moved by walkPath; the inner char container does the
+ * breathing/walking bob animation (the two don't conflict).
+ * Click -> gameBridge.select(name) -> React selects.
  */
 export class AgentSprite extends Phaser.GameObjects.Container {
   readonly agentId: string;
@@ -32,7 +33,7 @@ export class AgentSprite extends Phaser.GameObjects.Container {
     this.char = scene.add.container(0, 0);
     this.bodyRect = scene.add.rectangle(0, 4, 16, 16, 0x66ccff);
     this.bodyRect.setOrigin(0.5);
-    this.head = scene.add.rectangle(0, -8, 12, 12, 0xf1c27d); // 肤色
+    this.head = scene.add.rectangle(0, -8, 12, 12, 0xf1c27d); // skin tone
     this.head.setOrigin(0.5);
     this.char.add([this.head, this.bodyRect]);
 
@@ -43,7 +44,7 @@ export class AgentSprite extends Phaser.GameObjects.Container {
     this.add([this.char, this.label]);
     this.setSize(24, 32);
 
-    // 点击选中 (整个小人范围)
+    // Click to select (whole sprite hitbox)
     this.setInteractive(new Phaser.Geom.Rectangle(0, -12, 24, 34), Phaser.Geom.Rectangle.Contains);
     this.on("pointerup", () => gameBridge.select(this.name));
     this.on("pointerover", () => this.setScale(1.12));
@@ -61,12 +62,12 @@ export class AgentSprite extends Phaser.GameObjects.Container {
     this.animState = state;
     this.bobTween?.stop();
     if (state === AgentAnimState.Walking) {
-      // 走路: 快速上下 bob
+      // Walking: fast vertical bob
       this.bobTween = this.scene.tweens.add({
         targets: this.char, y: -3, duration: 140, yoyo: true, repeat: -1, ease: "Sine.inOut",
       });
     } else {
-      // idle / working: 慢呼吸
+      // idle / working: slow breathing
       this.bobTween = this.scene.tweens.add({
         targets: this.char, y: -2, duration: 900, yoyo: true, repeat: -1, ease: "Sine.inOut",
       });
@@ -77,7 +78,7 @@ export class AgentSprite extends Phaser.GameObjects.Container {
     this.setAnimState(AgentAnimState.Idle);
   }
 
-  /** 沿网格路径走 (waypoints 为像素坐标)，走完回 idle。 */
+  /** Walk along a grid path (waypoints are pixel coords); return to idle when done. */
   walkPath(waypoints: { x: number; y: number }[], onDone?: () => void): void {
     if (waypoints.length === 0) {
       this.setAnimState(AgentAnimState.Idle);
@@ -96,7 +97,7 @@ export class AgentSprite extends Phaser.GameObjects.Container {
     });
   }
 
-  /** 直线走到目标 (无寻路时的简单移动)。 */
+  /** Move straight to a target (simple move when no pathfinding is needed). */
   moveToPos(targetX: number, targetY: number): void {
     this.walkPath([{ x: targetX, y: targetY }]);
   }

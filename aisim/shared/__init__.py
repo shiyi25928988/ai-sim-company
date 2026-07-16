@@ -1,5 +1,5 @@
-"""Hub 与 Agent 共享的契约: 数据模型 / Redis 通道名 / 配置。
+"""Contracts shared between Hub and Agent: data models / Redis channel names / config.
 
-放在 `shared/` 下的代码会被同时复制进 Company Hub 镜像与 Agent 镜像，
-因此不得依赖 Hub 专属或 Agent 专属的模块。
+Code under `shared/` is copied into both the Company Hub image and the Agent image,
+so it must not depend on Hub-only or Agent-only modules.
 """

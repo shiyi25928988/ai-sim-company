@@ -1,7 +1,7 @@
-"""LLM 网关测试。
+"""LLM gateway tests.
 
-mocked 用 httpx.MockTransport，无需真实 Key/网络。
-live 用例仅当环境配置了真实 LLM_API_KEY 时运行。
+mocked uses httpx.MockTransport, no real Key/network needed.
+live tests only run when a real LLM_API_KEY is configured in the environment.
 """
 
 from __future__ import annotations
@@ -123,11 +123,11 @@ async def test_budget_guard_stops_calls():
     from aisim.shared.config import LLMConfig
 
     gw = LLMGateway(LLMConfig(api_key="sk-test", daily_budget=100))
-    gw.usage_today = 200  # 超预算
+    gw.usage_today = 200  # over budget
     profile = AgentProfile(agent_id="x", name="X", role="ceo", department="E", personality=Personality())
     resp = await gw.chat(profile, [{"role": "user", "content": "hi"}], tools=None)
     assert resp.error is not None and "预算超限" in resp.error
-    assert gw.usage_today == 200  # 没有新调用，不增加
+    assert gw.usage_today == 200  # no new call, no increase
     await gw.aclose()
 
 
@@ -158,11 +158,11 @@ async def test_system_prompt_injects_skills():
     await gw.aclose()
 
 
-# ── 真实调用 (需配置 LLM_API_KEY) ──
+# ── Live calls (requires LLM_API_KEY configured) ──
 
 
 async def test_live_call():
-    # 显式 opt-in，避免 .env 自动加载真实 key 时常规 pytest 误触发计费调用。
+    # explicit opt-in, to avoid accidental billing calls when .env auto-loads a real key during regular pytest.
     if os.environ.get("LLM_LIVE_TEST") not in ("1", "true", "yes"):
         pytest.skip("未启用真实调用 (设 LLM_LIVE_TEST=1 以运行)")
     key = os.environ.get("LLM_API_KEY")

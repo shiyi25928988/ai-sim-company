@@ -1,4 +1,4 @@
-"""file_ops - 共享文件读写 (见 §九 文件存储)。"""
+"""file_ops - shared file read/write (see §九 file storage)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class WriteFileTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 解析路径并写入 Volume (防越界)
+        # TODO: resolve the path and write to the Volume (prevent traversal)
         return {"status": "written", "path": kwargs.get("path")}
 
 
@@ -36,7 +36,7 @@ class ReadFileTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 读取 Volume 文件
+        # TODO: read the Volume file
         return {"status": "ok", "path": kwargs.get("path"), "content": ""}
 
 
@@ -50,7 +50,7 @@ class ListFilesTool(BaseTool):
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: 列目录
+        # TODO: list the directory
         return {"status": "ok", "path": kwargs.get("path"), "files": []}
 
 

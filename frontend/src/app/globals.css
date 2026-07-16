@@ -1,4 +1,4 @@
-# 像素风: 等宽字体 + 无平滑
+# Pixel style: monospace font + no smoothing
 @import "tailwindcss";
 
 :root {
@@ -10,14 +10,14 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden; /* 禁止整页滚动 (办公室固定) */
+  overflow: hidden; /* disable page scroll (office is fixed-size) */
   background: #0f0f1a;
   color: #e5e7eb;
   font-family: var(--pixel-font);
   image-rendering: pixelated;
 }
 
-/* 像素风卡片 */
+/* Pixel-style panel */
 .pixel-panel {
   border: 2px solid #3a3a5c;
   background: rgba(20, 20, 40, 0.85);

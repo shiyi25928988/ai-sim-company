@@ -1,4 +1,4 @@
-"""经济系统 - 收支 / 薪资 / 融资 / 破产判定 (见 §三)。"""
+"""Economy system - income/expenses / salary / funding / bankruptcy detection (see §三)."""
 
 from __future__ import annotations
 
@@ -11,29 +11,29 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EconomyState:
     capital: int = 0
-    monthly_burn: int = 0  # 月烧钱 (薪资合计 + 运营成本)
+    monthly_burn: int = 0  # Monthly burn (total salary + operating costs)
     revenue: int = 0
     history: list[dict] = field(default_factory=list)
     bankrupt: bool = False
 
 
 class EconomyEngine:
-    """公司财务模拟。"""
+    """Company finance simulation."""
 
     def __init__(self, initial_capital: int = 500_000) -> None:
         self.state = EconomyState(capital=initial_capital)
 
     def add_salary(self, salary: int) -> None:
-        """新增 Agent 时累加其薪资到月烧钱。"""
+        """When adding a new Agent, accumulate its salary into the monthly burn."""
         self.state.monthly_burn += salary
 
     def remove_salary(self, salary: int) -> None:
         self.state.monthly_burn = max(0, self.state.monthly_burn - salary)
 
     def apply_tick(self, tick: int) -> None:
-        """每个 Tick 结算: 扣减成本 / 记账 / 破产判定。
+        """Settle each Tick: deduct costs / bookkeeping / bankruptcy detection.
 
-        假设 720 Tick/月 (1 Tick≈1小时)，按月烧钱线性扣减。
+        Assumes 720 Ticks/month (1 Tick≈1 hour), deducted linearly by monthly burn.
         """
         per_tick = self.state.monthly_burn / 720
         self.state.capital -= int(per_tick)
@@ -44,7 +44,7 @@ class EconomyEngine:
             logger.warning("公司破产! tick=%d", tick)
 
     def receive_funding(self, amount: int) -> None:
-        """融资入账。"""
+        """Funding received."""
         self.state.capital += amount
         logger.info("融资入账: +%d -> %d", amount, self.state.capital)
 

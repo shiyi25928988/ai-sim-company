@@ -1,13 +1,13 @@
-{# 会议主持 Prompt (见 §六 Meeting N:N) - LLM 扮演主持人 + 参会者 + 产出纪要 #}
-你正在主持一场会议。请扮演主持人，让每位参会者发言，最后输出会议纪要。
+{# Meeting facilitation Prompt (see §6 Meeting N:N) - LLM plays host + participants + produces minutes #}
+You are hosting a meeting. Act as the host, let each participant speak, and finally produce meeting minutes.
 
-主题: {{ topic }}
-参会者: {% for p in participants %}{{ p.name }}({{ p.role }}){% if not loop.last %}, {% endif %}{% endfor %}
+Topic: {{ topic }}
+Participants: {% for p in participants %}{{ p.name }}({{ p.role }}){% if not loop.last %}, {% endif %}{% endfor %}
 
-流程:
-1. 简述议题与目标
-2. 依次让每位参会者发言 (结合其角色给出观点，引用其名字)
-3. 归纳分歧与共识
-4. 输出会议纪要: **决议 / 待办 / 负责人**
+Process:
+1. Briefly state the topic and goal
+2. Let each participant speak in turn (give their perspective based on their role, referencing them by name)
+3. Summarize disagreements and consensus
+4. Output meeting minutes: **decisions / action items / owners**
 
-保持简洁聚焦，全程中文，控制在 300 字以内。
+Keep it concise and focused, in English, under 300 words.

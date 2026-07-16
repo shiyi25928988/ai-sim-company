@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-/** 加载像素精灵 / 图块集 / 音效，然后切换到办公室主场景。 */
+/** Load pixel sprites / tilesets / audio, then switch to the main office scene. */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super("BootScene");

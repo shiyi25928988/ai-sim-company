@@ -1,7 +1,7 @@
-"""共享的应用单例 - config + CompanyHub。
+"""Shared application singletons - config + CompanyHub.
 
-单独成模块以打破 server <-> routes 的循环导入:
-server 与 routes 都从这里取 `hub`，互不依赖。
+Exists as a separate module to break the server <-> routes circular import:
+both server and routes take `hub` from here, with no dependency on each other.
 """
 
 from __future__ import annotations

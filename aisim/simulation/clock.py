@@ -1,4 +1,4 @@
-"""仿真时钟 - 统一的 Tick 信号广播 (见 §三/§六 simulation:tick)。"""
+"""Simulation clock - unified Tick signal broadcast (see §三/§六 simulation:tick)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class SimulationClock:
-    """按固定间隔触发 Tick，并调用回调广播 simulation:tick。"""
+    """Trigger a Tick at a fixed interval and invoke a callback to broadcast simulation:tick."""
 
     def __init__(self, interval_ms: int = 5000) -> None:
         self.interval_ms = interval_ms
@@ -34,7 +34,7 @@ class SimulationClock:
             self._task = None
 
     def set_speed(self, speed: float) -> None:
-        """1x / 10x / 60x 倍速。"""
+        """1x / 10x / 60x speed multiplier."""
         self.speed = max(0.0, speed)
 
     @property

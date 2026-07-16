@@ -1,5 +1,14 @@
-# Pixel style: monospace font + no smoothing
 @import "tailwindcss";
+
+/* Pixel-art design tokens (Tailwind v4 @theme -> utilities like bg-canvas, text-accent) */
+@theme {
+  --color-canvas: #0f0f1a;
+  --color-panel-border: #3a3a5c;
+  --color-accent: #22d3ee;
+  --color-warn: #fcd34d;
+  --color-bad: #fb7185;
+  --color-good: #34d399;
+}
 
 :root {
   --pixel-font: "Courier New", monospace;
@@ -10,8 +19,8 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden; /* disable page scroll (office is fixed-size) */
-  background: #0f0f1a;
+  overflow: hidden; /* disable page scroll (fixed-size console) */
+  background: var(--color-canvas);
   color: #e5e7eb;
   font-family: var(--pixel-font);
   image-rendering: pixelated;
@@ -19,7 +28,26 @@ body {
 
 /* Pixel-style panel */
 .pixel-panel {
-  border: 2px solid #3a3a5c;
+  border: 2px solid var(--color-panel-border);
   background: rgba(20, 20, 40, 0.85);
   box-shadow: 0 0 0 2px #000;
+}
+
+/* Pixel-style scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f0f1a;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-panel-border);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a6c;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-panel-border) #0f0f1a;
 }

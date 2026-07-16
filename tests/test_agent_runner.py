@@ -71,6 +71,7 @@ class FakeHub:
         self.config = SimpleNamespace(
             llm=SimpleNamespace(max_iters=3),
             simulation=SimpleNamespace(agent_think_every=1),
+            company=SimpleNamespace(business_description="", monthly_budget=0),
         )
         self.events: list[dict] = []
         self.created: list[dict] = []
@@ -250,7 +251,7 @@ async def test_error_response_emits_action():
     runner = SimulatedAgentRunner(hub)
     runner.register(_profile())
     await runner._agent_tick("ceo-alex", await hub.snapshot())
-    assert any("LLM 错误" in e.get("action", "") for e in hub.events)
+    assert any("LLM error" in e.get("action", "") for e in hub.events)
     assert len(hub.llm_gateway.calls) == 1  # stop on error
 
 
@@ -327,7 +328,7 @@ async def test_ceo_directive_delegates_hiring_to_hr():
     assert "HR Director" in d0 and "create_agent" in d0
     # has HR, no engineers -> CEO delegates, forbidden from hiring engineers oneself
     d1 = SimulatedAgentRunner._directive(ceo, [{"role": "ceo"}, {"role": "hr-director"}], [])
-    assert "不要" in d1 and "create_agent 招工程师" in d1
+    assert "Do not create_agent" in d1 and "hire engineers" in d1
     # HR perspective: missing engineers -> HR hires
     hr = AgentProfile(agent_id="h", name="H", role="hr-director", department="People", personality=Personality())
     d2 = SimulatedAgentRunner._directive(hr, [{"role": "ceo"}, {"role": "hr-director"}], [])

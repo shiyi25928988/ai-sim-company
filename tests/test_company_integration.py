@@ -37,6 +37,10 @@ def hub():
 
     cfg = load_config("config/company.yaml")
     h = CompanyHub(cfg)
+    # Clear persisted Hub state so _restore_state doesn't pick up a stale monthly_burn from a prior run.
+    h.db.connect()
+    h.db.delete("hub_state")
+    h.db.close()
     yield h, channels  # synchronous yield; start/stop controlled explicitly in each test
 
 

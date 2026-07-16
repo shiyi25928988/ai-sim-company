@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { API_URL } from "@/lib/config";
+import { useGameStore } from "@/store/useGameStore";
+import { useToastStore } from "@/store/useToastStore";
+import { MeetingDialog } from "@/components/MeetingDialog";
+import type { GameSnapshot } from "@/types/game";
 
 async function control(action: string, speed?: number): Promise<void> {
   try {
@@ -15,10 +19,12 @@ async function control(action: string, speed?: number): Promise<void> {
   }
 }
 
-/** Bottom bar controls: play/pause / speed (1x/10x/60x) / snapshot / open office. */
-export function ControlBar({ onOpenOffice }: { onOpenOffice: () => void }) {
+/** Bottom bar controls: play/pause / speed / meeting / refresh snapshot. */
+export function ControlBar() {
   const [speed, setSpeed] = useState(1);
   const [playing, setPlaying] = useState(true);
+  const [meetingOpen, setMeetingOpen] = useState(false);
+  const toast = useToastStore((s) => s.push);
 
   const changeSpeed = (s: number) => {
     setSpeed(s);
@@ -36,29 +42,56 @@ export function ControlBar({ onOpenOffice }: { onOpenOffice: () => void }) {
     void control("step");
   };
 
+  const refresh = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/state`);
+      const s = (await r.json()) as GameSnapshot;
+      useGameStore.getState().setSnapshot(s);
+      toast("State refreshed", "info");
+    } catch {
+      toast("Failed to refresh state", "error");
+    }
+  };
+
   return (
-    <div className="pixel-panel flex items-center justify-center gap-4 px-4 py-1 text-sm">
-      <button onClick={togglePlay} className="hover:text-cyan-300">
-        {playing ? "⏸ Pause" : "▶ Play"}
-      </button>
-      <button onClick={step} className="hover:text-cyan-300">
-        ⏭ Step
-      </button>
-      {[1, 10, 60].map((s) => (
+    <>
+      <div className="pixel-panel flex items-center justify-center gap-4 px-4 py-1 text-sm">
         <button
-          key={s}
-          onClick={() => changeSpeed(s)}
-          className={speed === s ? "text-cyan-300" : "hover:text-cyan-300"}
+          onClick={togglePlay}
+          className="hover:text-cyan-300"
+          aria-label={playing ? "Pause" : "Play"}
         >
-          {s}x
+          {playing ? "⏸ Pause" : "▶ Play"}
         </button>
-      ))}
-      <button className="hover:text-cyan-300" onClick={() => void control("play")}>
-        📸 Snapshot
-      </button>
-      <button className="hover:text-cyan-300" onClick={onOpenOffice}>
-        🏢 Show Office
-      </button>
-    </div>
+        <button onClick={step} className="hover:text-cyan-300" aria-label="Step">
+          ⏭ Step
+        </button>
+        {[1, 10, 60].map((s) => (
+          <button
+            key={s}
+            onClick={() => changeSpeed(s)}
+            className={speed === s ? "text-cyan-300" : "hover:text-cyan-300"}
+            aria-label={`${s}x speed`}
+          >
+            {s}x
+          </button>
+        ))}
+        <button
+          className="hover:text-cyan-300"
+          onClick={() => setMeetingOpen(true)}
+          aria-label="Convene meeting"
+        >
+          📋 Meeting
+        </button>
+        <button
+          className="hover:text-cyan-300"
+          onClick={() => void refresh()}
+          aria-label="Refresh state"
+        >
+          🔄 Refresh
+        </button>
+      </div>
+      <MeetingDialog open={meetingOpen} onClose={() => setMeetingOpen(false)} />
+    </>
   );
 }

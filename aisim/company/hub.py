@@ -124,6 +124,52 @@ class CompanyHub:
         self.db.close()
         self._started = False
 
+    async def apply_config(self, new_config: Config) -> dict:
+        """Apply a new config at runtime: stop, clear all state, reinit components, restart.
+
+        Used by POST /api/config so the user can reconfigure business/budget without restarting
+        the process. The Hub instance is reused so existing references (e.g. routes' `hub`) stay
+        valid. Returns the fresh snapshot.
+        """
+        if self._started:
+            await self.stop()
+        self.config = new_config
+
+        # Clear persisted + hot state for a fresh start
+        try:
+            await self.message_bus.connect(self.config.redis_url)
+            await self.message_bus.delete(
+                channels.KEY_AGENTS, channels.KEY_PROFILES, channels.KEY_TASKS,
+                channels.KEY_SKILLS, channels.KEY_META,
+            )
+            await self.message_bus.close()
+        except Exception:  # noqa: BLE001
+            logger.exception("clear Redis failed during apply_config")
+        try:
+            db = Database()
+            db.connect()
+            db.delete("hub_state")
+            db.close()
+        except Exception:  # noqa: BLE001
+            logger.exception("clear SQLite failed during apply_config")
+
+        # Reinit components (keep message_bus / on_frontend_event)
+        self.clock = SimulationClock(interval_ms=new_config.simulation.tick_interval_ms)
+        self.economy = EconomyEngine(initial_capital=new_config.company.initial_capital)
+        self.agent_manager = AgentManager(self.message_bus)
+        self.agent_runner = SimulatedAgentRunner(self)
+        self.profile_registry = ProfileRegistry(self.message_bus)
+        self.org_chart = OrgChart()
+        self.task_manager = TaskManager(self.message_bus)
+        self.skill_pool = SkillPool(self.message_bus)
+        self.llm_gateway = LLMGateway(new_config.llm)
+        self.llm_gateway.skill_pool = self.skill_pool
+        self.db = Database()
+        self._started = False
+
+        await self.start()
+        return await self.snapshot()
+
     async def _seed_ceo(self) -> None:
         """Company founding: the CEO exists immediately (registered directly in local simulated mode)."""
         ceo_id = self.config.ceo.agent_id
@@ -366,7 +412,7 @@ class CompanyHub:
             category=SkillCategory.TECHNICAL,
             level=SkillLevel.ROLE,
             scope=[target_role],
-            description=f"由 {source_agent_id} 传授",
+            description=f"Taught by {source_agent_id}",
             prompt_injection=prompt_injection,
             created_by=source_agent_id,
             status=SkillStatus.PUBLISHED,
@@ -387,7 +433,7 @@ class CompanyHub:
             category=src.category,
             level=SkillLevel.PERSONAL,
             scope=[agent_id],
-            description=f"{agent_id} 从公司池学习",
+            description=f"{agent_id} learned from company pool",
             prompt_injection=src.prompt_injection,
             created_by=agent_id,
             created_from=src.id,
@@ -412,7 +458,7 @@ class CompanyHub:
                 parts.append({"name": st["name"], "role": st["role"], "id": pid})
                 names.append(st["name"])
         if not parts:
-            return "无有效参会者"
+            return "No valid participants"
 
         await self.emit_frontend({"type": "meeting_start", "participants": names})
         meeting = self.meeting_system.schedule(
@@ -424,7 +470,7 @@ class CompanyHub:
         minutes = await self.meeting_system.run(meeting, parts, host, self.llm_gateway)
         # Broadcast minutes to everyone
         await self.message_bus.broadcast_announcement(
-            caller_id, f"[会议纪要:{topic}]\n{minutes}"
+            caller_id, f"[Meeting minutes: {topic}]\n{minutes}"
         )
         await self.emit_frontend(
             {"type": "meeting_minutes", "topic": topic, "minutes": minutes[:500],

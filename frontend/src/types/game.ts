@@ -64,9 +64,18 @@ export interface Skill {
   usage_count: number;
 }
 
+export type LogKind =
+  | "message"
+  | "action"
+  | "created"
+  | "meeting"
+  | "task"
+  | "system";
+
 export type LogEntry = {
   ts: number;
   text: string;
+  kind: LogKind;
 };
 
 // Hub -> frontend render events (see §6). Fields align with backend hub.snapshot_event / emit_frontend.

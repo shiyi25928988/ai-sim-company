@@ -9,16 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.2",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "phaser": "^3.87.0",
-    "easystarjs": "^0.4.4",
-    "howler": "^2.2.4"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/howler": "^2.2.12",
+    "@tanstack/react-query-devtools": "^5.101.2",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

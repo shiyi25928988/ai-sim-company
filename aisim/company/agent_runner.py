@@ -121,7 +121,7 @@ class SimulatedAgentRunner:
         try:
             profile = rt.profile
             tasks = await self.hub.task_manager.pending_for(agent_id, profile.role)
-            user_msg = self._build_prompt(profile, snapshot, rt.memory, tasks)
+            user_msg = self._build_prompt(profile, snapshot, rt.memory, tasks, self.hub.config.company)
             messages: list[dict] = [{"role": "user", "content": user_msg}]
             max_iters = self.hub.config.llm.max_iters
             tick = snapshot.get("tick", 0)
@@ -134,7 +134,7 @@ class SimulatedAgentRunner:
                     logger.warning("[%s] LLM 错误: %s", agent_id, resp.error)
                     await self.hub.emit_frontend(
                         {"type": "agent_action", "agent": profile.name,
-                         "action": f"(LLM 错误: {resp.error})"}
+                         "action": f"(LLM error: {resp.error})"}
                     )
                     break
                 if resp.content and not thought:
@@ -179,33 +179,37 @@ class SimulatedAgentRunner:
 
     # ── Prompt assembly ──
     @staticmethod
-    def _build_prompt(profile: AgentProfile, snapshot: dict, memory: MemoryManager, tasks: list) -> str:
+    def _build_prompt(profile: AgentProfile, snapshot: dict, memory: MemoryManager, tasks: list, company) -> str:
         from aisim.tools import all_tools
 
         agents = snapshot.get("agents", [])
         team = ", ".join(
             f"{a['name']}({a['role']}, id={a.get('agent_id', a['name'])})" for a in agents
-        ) or "无"
+        ) or "(none)"
         eco = snapshot.get("economy", {})
-        recent = "\n".join(f"- {m.content}" for m in memory.recent(5)) or "(无)"
+        recent = "\n".join(f"- {m.content}" for m in memory.recent(5)) or "(none)"
         registered = set(all_tools().keys())
-        tools = ", ".join(t for t in profile.tools if t in registered) or "(无)"
+        tools = ", ".join(t for t in profile.tools if t in registered) or "(none)"
         directive = SimulatedAgentRunner._directive(profile, agents, tasks)
         task_lines = (
-            "\n".join(f"- [{t.id}] {t.title}：{t.description}" for t in tasks)
+            "\n".join(f"- [{t.id}] {t.title}: {t.description}" for t in tasks)
             if tasks
-            else "(无)"
+            else "(none)"
         )
+        biz = company.business_description
+        budget = company.monthly_budget
+        budget_line = f" Budget cap: ${budget}/mo." if budget else ""
         return (
-            f"Tick {snapshot.get('tick', 0)}。公司: {snapshot.get('company', '')}，"
-            f"资金 ${eco.get('capital', 0)}，月烧钱 ${eco.get('monthly_burn', 0)}，"
-            f"团队({len(agents)}人): {team}。\n"
+            f"Tick {snapshot.get('tick', 0)}. Company: {snapshot.get('company', '')}."
+            f"{' Business: ' + biz if biz else ''}\n"
+            f"Capital ${eco.get('capital', 0)}, monthly burn ${eco.get('monthly_burn', 0)}.{budget_line}"
+            f" Team ({len(agents)}): {team}.\n"
             f"{directive}\n"
-            f"你的待办任务:\n{task_lines}\n"
-            f"近期行动/记忆:\n{recent}\n"
-            f"可用工具: {tools}。\n"
-            f"请决定这一步的行动并调用工具。可连续调用多个工具，每个工具会返回结果，"
-            f"你可基于结果继续行动；无更多动作时回复文本结束。"
+            f"Your pending tasks:\n{task_lines}\n"
+            f"Recent actions/memory:\n{recent}\n"
+            f"Available tools: {tools}.\n"
+            f"Decide your action this step and call tools. You may call multiple tools in sequence; "
+            f"each returns a result you can act on. When you have no further actions, reply with text to end the turn."
         )
 
     @staticmethod
@@ -215,24 +219,24 @@ class SimulatedAgentRunner:
         if profile.role == "ceo":
             if "hr-director" not in roles:
                 return (
-                    "⚠️ 公司只有你一人。立即 create_agent 招聘一名 HR Director "
-                    '(role="hr-director", department="People", salary=120000)--这是你唯一直接招聘的角色。'
+                    "⚠️ You are the only one in the company. Immediately create_agent to hire an HR Director "
+                    '(role="hr-director", department="People", salary=120000) - this is the only role you hire directly.'
                 )
             # HR is in place: hiring engineers/designers is HR's job, CEO no longer create_agent to hire
             if "senior-engineer" not in roles or "junior-engineer" not in roles:
                 return (
-                    "HR 已就位。招聘 senior-engineer 与 junior-engineer 是 HR 的职责，"
-                    "**你不要 create_agent 招工程师**。用 send_message 给 HR (id 见团队列表) 下达招聘指令，"
-                    "本 tick 可先规划项目方向。"
+                    "HR is in place. Hiring senior-engineer and junior-engineer is HR's job. "
+                    "**Do not create_agent to hire engineers yourself.** Use send_message to instruct HR (id in team list) to hire; "
+                    "this tick you may plan project direction first."
                 )
             if "designer" not in roles and len(agents) < 5:
                 return (
-                    "工程团队已就位。用 send_message 让 HR 招一名 designer (不要自己招)；"
-                    "同时用 create_task 给 senior-engineer 派第一个任务。"
+                    "Engineering team is in place. Use send_message to have HR hire a designer (don't hire yourself); "
+                    "also use create_task to assign the first task to a senior-engineer."
                 )
             return (
-                "团队齐备，**停止招聘**。用 create_task 给工程师派活 "
-                "(assignee_role='senior-engineer'，写清 title/description)，每 tick 创建 1 个新任务直到 2-3 个在途。"
+                "Team is complete, **stop hiring**. Use create_task to assign work to engineers "
+                "(assignee_role='senior-engineer', clear title/description); create 1 new task per tick until 2-3 are in flight."
             )
         if profile.role == "hr-director":
             missing = []
@@ -242,21 +246,21 @@ class SimulatedAgentRunner:
                 missing.append("junior-engineer")
             if missing:
                 return (
-                    f"你是 HR，负责招聘。团队缺 {'/'.join(missing)}，"
-                    "立即用 create_agent 招聘 (先 senior 再 junior)。"
+                    f"You are HR, responsible for hiring. The team is missing {'/'.join(missing)}; "
+                    "immediately use create_agent to hire (senior first, then junior)."
                 )
             if "designer" not in roles and len(agents) < 5:
-                return "工程团队齐备，用 create_agent 招一名 designer。"
-            return "团队齐备，**停止招聘**。可用 send_message 协助沟通。"
+                return "Engineering team is complete; use create_agent to hire a designer."
+            return "Team is complete, **stop hiring**. You may use send_message to help with communication."
         # Engineers / designers
         if tasks:
             ids = ", ".join(t.id for t in tasks)
             return (
-                f"立即用 complete_task 完成其中一个任务 (task_id 从上面任选: {ids})。"
-                "web_search 未接真实搜索 API、write_code/run_tests 是桩，不必调用；"
-                "result 写清你实现了什么、产出什么。"
+                f"Immediately use complete_task to finish one of the tasks (pick any task_id from above: {ids}). "
+                "web_search has no real search API backing it, and write_code/run_tests are stubs - no need to call them; "
+                "write in result what you implemented and what you produced."
             )
-        return "暂无待办任务；用 send_message 向 CEO 请求任务。"
+        return "No pending tasks; use send_message to ask the CEO for work."
 
     # ── Tool execution (returns a result string for the LLM's next turn) ──
     async def _execute_tool(
@@ -265,7 +269,7 @@ class SimulatedAgentRunner:
     ) -> str:
         rt.memory.add(MemoryEntry(
             id=f"tool-{tick}-{name}-{agent_id}-{len(rt.memory.recent(99))}",
-            content=f"调用工具 {name}({args})", memory_type="action",
+            content=f"Called tool {name}({args})", memory_type="action",
         ))
 
         if name == "create_agent":
@@ -277,7 +281,7 @@ class SimulatedAgentRunner:
             await self.hub.emit_frontend(
                 {"type": "agent_action", "agent": profile.name,
                  "action": f"create_agent -> {r.get('name', '')}({r.get('role', '')})"})
-            return f"已创建 Agent {r.get('name', '')} ({r.get('role', '')}), agent_id={r.get('agent_id', '')}"
+            return f"Created Agent {r.get('name', '')} ({r.get('role', '')}), agent_id={r.get('agent_id', '')}"
 
         if name == "send_message":
             content = args.get("content", "")
@@ -286,11 +290,11 @@ class SimulatedAgentRunner:
                 await self.hub.message_bus.send_dm(agent_id, recipient, content)
                 await self.hub.emit_frontend(
                     {"type": "agent_message", "sender": profile.name, "content": content[:200]})
-                return f"已向 {recipient} 发送消息"
+                return f"Sent message to {recipient}"
             await self.hub.message_bus.broadcast_announcement(agent_id, content)
             await self.hub.emit_frontend(
                 {"type": "agent_message", "sender": profile.name, "content": content[:200]})
-            return "已广播公告"
+            return "Broadcast announcement"
 
         if name == "call_meeting":
             participants = args.get("participants", [])
@@ -298,7 +302,7 @@ class SimulatedAgentRunner:
             await self.hub.emit_frontend(
                 {"type": "agent_action", "agent": profile.name,
                  "action": f"call_meeting: {args.get('topic', '')}"})
-            return f"会议纪要:\n{minutes[:400]}"
+            return f"Meeting minutes:\n{minutes[:400]}"
 
         if name == "create_task":
             t = await self.hub.create_task(
@@ -310,8 +314,8 @@ class SimulatedAgentRunner:
             await self.hub.emit_frontend(
                 {"type": "agent_action", "agent": profile.name,
                  "action": f"create_task -> {t.get('title', '')}"})
-            return (f"已创建任务 '{t.get('title', '')}' (id={t.get('id', '')}), "
-                    f"派给 {t.get('assignee_role', '') or t.get('assignee', '')}")
+            return (f"Created task '{t.get('title', '')}' (id={t.get('id', '')}), "
+                    f"assigned to {t.get('assignee_role', '') or t.get('assignee', '')}")
 
         if name == "complete_task":
             r = await self.hub.complete_task(
@@ -319,7 +323,7 @@ class SimulatedAgentRunner:
             await self.hub.emit_frontend(
                 {"type": "agent_action", "agent": profile.name,
                  "action": f"complete_task {args.get('task_id')}"})
-            return "任务已完成" if r else f"任务 {args.get('task_id')} 不存在或已完成"
+            return "Task completed" if r else f"Task {args.get('task_id')} does not exist or is already completed"
 
         if name == "share_skill":
             await self.hub.share_skill(
@@ -328,7 +332,7 @@ class SimulatedAgentRunner:
             await self.hub.emit_frontend(
                 {"type": "agent_action", "agent": profile.name,
                  "action": f"share_skill -> {args.get('target_role')}: {args.get('name')}"})
-            return f"已分享 Skill '{args.get('name', '')}' 给 {args.get('target_role', '')}"
+            return f"Shared Skill '{args.get('name', '')}' with {args.get('target_role', '')}"
 
         if name == "learn_skill":
             r = await self.hub.learn_skill(agent_id, args.get("query", ""))
@@ -336,10 +340,10 @@ class SimulatedAgentRunner:
                 {"type": "agent_action", "agent": profile.name,
                  "action": f"learn_skill: {args.get('query')}"})
             learned = r.get("name") if isinstance(r, dict) and r.get("name") else None
-            return f"已学习 Skill: {learned}" if learned else f"未找到与 '{args.get('query', '')}' 相关的 Skill"
+            return f"Learned Skill: {learned}" if learned else f"No Skill found matching '{args.get('query', '')}'"
 
         # Unimplemented / stub tools (web_search / write_code / write_file etc.)
         await self.hub.emit_frontend(
             {"type": "agent_action", "agent": profile.name, "action": name, "target": args.get("target")})
         logger.info("[%s] 桩工具 %s(%s)", profile.name, name, args)
-        return f"工具 {name} 未实现或无有效返回 (桩)"
+        return f"Tool {name} is not implemented or has no valid return (stub)"

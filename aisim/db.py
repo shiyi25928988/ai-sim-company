@@ -49,6 +49,13 @@ class Database:
         ).fetchone()
         return json.loads(row[0]) if row else None
 
+    def delete(self, key: str) -> None:
+        """Delete a key."""
+        if self._conn is None:
+            return
+        self._conn.execute("DELETE FROM state WHERE key=?", (key,))
+        self._conn.commit()
+
     def close(self) -> None:
         if self._conn is not None:
             self._conn.close()

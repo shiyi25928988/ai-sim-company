@@ -51,7 +51,10 @@ async def state_snapshot() -> dict:
 
 @router.get("/agents")
 async def list_agents() -> list[dict]:
-    return await hub.agent_manager.list()
+    agents = await hub.agent_manager.list()
+    for a in agents:
+        a["recent"] = hub.agent_runner.recent_memory(a.get("agent_id", ""), 5)
+    return agents
 
 
 @router.post("/agents")
@@ -71,6 +74,7 @@ async def get_agent(agent_id: str) -> dict:
     state = await hub.agent_manager.get(agent_id)
     if state is None:
         raise HTTPException(status_code=404, detail=f"agent not found: {agent_id}")
+    state["recent"] = hub.agent_runner.recent_memory(agent_id, 5)
     return state
 
 
@@ -158,3 +162,52 @@ async def create_meeting(req: MeetingRequest) -> dict:
     caller = req.caller or hub.config.ceo.agent_id
     minutes = await hub.call_meeting(caller, req.topic, req.participants)
     return {"topic": req.topic, "participants": req.participants, "minutes": minutes[:1000]}
+
+
+# ═══ Config (business setup) ═══
+
+
+class ConfigRequest(BaseModel):
+    name: str
+    business_description: str = ""
+    initial_capital: int = 500_000
+    monthly_budget: int = 0  # 0 = unlimited
+
+
+@router.get("/config")
+async def get_config() -> dict:
+    """Current business config (does not expose the LLM API key)."""
+    c = hub.config.company
+    return {
+        "name": c.name,
+        "business_description": c.business_description,
+        "initial_capital": c.initial_capital,
+        "monthly_budget": c.monthly_budget,
+    }
+
+
+@router.post("/config")
+async def update_config(req: ConfigRequest) -> dict:
+    """Update business config (writes config/company.yaml, merged) and hot-reload the Hub."""
+    import yaml
+    from pathlib import Path
+
+    from aisim.shared.config import load_config
+
+    cfg_path = Path("config/company.yaml")
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    existing: dict = {}
+    if cfg_path.exists():
+        existing = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    existing["company"] = {
+        "name": req.name,
+        "business_description": req.business_description,
+        "initial_capital": req.initial_capital,
+        "monthly_budget": req.monthly_budget,
+    }
+    cfg_path.write_text(
+        yaml.safe_dump(existing, default_flow_style=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    new_config = load_config(str(cfg_path))
+    return await hub.apply_config(new_config)

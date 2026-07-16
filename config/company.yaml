@@ -1,46 +1,31 @@
-# ─────────────────────────────────────────────
-# ai-sim-company - 公司初始配置
-# 由 Company Hub 启动时加载 (见 aisim/shared/config.py)
-# ${VAR} 占位符从环境变量读取
-# ─────────────────────────────────────────────
-
-company:
-  name: "Acme AI Inc."
-  initial_capital: 500000   # 初始资金 ($)
-
-# 公司创立时即存在的 CEO Agent
 ceo:
   agent_id: ceo-alex
-  name: Alex
-  role: ceo
   department: Executive
-  salary: 0                 # CEO 不领薪资
-  personality:              # Big-5
+  name: Alex
+  personality:
+    agreeableness: 0.6
+    conscientiousness: 0.9
+    extraversion: 0.8
+    neuroticism: 0.3
     openness: 0.85
-    conscientiousness: 0.90
-    extraversion: 0.80
-    agreeableness: 0.60
-    neuroticism: 0.30
-
-# LLM 统一网关 (API Key 只在这里配一次)
+  role: ceo
+  salary: 0
+company:
+  business_description: Build a CLI tool for developers. Ship fast, charge 20 USD/mo.
+  initial_capital: 500000
+  monthly_budget: 80000
+  name: Demo AI Co.
 llm:
-  provider: ${LLM_PROVIDER}
   api_key: ${LLM_API_KEY}
-  base_url: ${LLM_BASE_URL}        # OpenAI 兼容端点; 留空用官方 https://api.openai.com/v1
+  base_url: ${LLM_BASE_URL}
+  daily_budget: 2000000
   default_model: ${LLM_MODEL}
-  daily_budget: 2000000     # 每日 Token 预算
-  enable_tools: ${LLM_TOOLS_ENABLED}   # 是否启用 function-calling (端点不支持时设 false)
-  max_iters: ${LLM_MAX_ITERS}          # 单 Agent 单 tick 的 LLM<->工具 最大循环轮数 (控成本)
-  # 角色 -> 模型路由 (可选)。未列出的角色用 default_model (LLM_MODEL)。
-  # 单端点 (DeepSeek/智谱/one-api) 通常留空，全员用 LLM_MODEL; 需差异化时按角色指定。
+  enable_tools: ${LLM_TOOLS_ENABLED}
+  max_iters: ${LLM_MAX_ITERS}
+  provider: ${LLM_PROVIDER}
   routing: {}
-  # 示例 (多模型端点时):
-  #   ceo: deepseek-v4-pro
-  #   senior-engineer: deepseek-v4-flash
-
-# 仿真引擎
 simulation:
+  agent_step_delay_ms: ${AGENT_STEP_DELAY_MS}
+  agent_think_every: ${AGENT_THINK_EVERY}
+  auto_start: ${SIM_AUTO_START}
   tick_interval_ms: ${TICK_INTERVAL_MS}
-  auto_start: ${SIM_AUTO_START}        # 启动即跑? 默认 false (暂停，手动 play，控成本)
-  agent_think_every: ${AGENT_THINK_EVERY}  # Agent 每 N tick 思考一次 (1=每次)
-  agent_step_delay_ms: ${AGENT_STEP_DELAY_MS}  # 单步模式下 Agent 间间隔 (ms)

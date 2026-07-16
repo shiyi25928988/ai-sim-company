@@ -91,7 +91,7 @@ class SimulatedAgentRunner:
     async def run_tick_sequential(self, tick: int) -> None:
         """Step mode: Agents think one by one (sequential + interval), observable; awaits all to finish.
 
-        用于 hub.step() —— 用户每点一次"单步"        Used by hub.step() -- each time the user clicks "step" one tick advances and Agents act one by one,
+        Used by hub.step() -- each time the user clicks "step" one tick advances and Agents act one by one,
         making it easy to see the interaction rhythm. The interval is controlled by AGENT_STEP_DELAY_MS.
         """
         if not self._running:
@@ -177,7 +177,7 @@ class SimulatedAgentRunner:
         finally:
             rt.busy = False
 
-    # ── Prompt 组装 ──
+    # ── Prompt assembly ──
     @staticmethod
     def _build_prompt(profile: AgentProfile, snapshot: dict, memory: MemoryManager, tasks: list) -> str:
         from aisim.tools import all_tools
@@ -210,7 +210,7 @@ class SimulatedAgentRunner:
 
     @staticmethod
     def _directive(profile: AgentProfile, agents: list, tasks: list) -> str:
-        """按角色/团队/任务现状给具体行动指令 (强引导，避免空转 + 分工)。"""
+        """Give concrete action directives based on role/team/task state (strong guidance, to avoid spinning + divide labor)."""
         roles = {a.get("role") for a in agents}
         if profile.role == "ceo":
             if "hr-director" not in roles:
@@ -218,7 +218,7 @@ class SimulatedAgentRunner:
                     "⚠️ 公司只有你一人。立即 create_agent 招聘一名 HR Director "
                     '(role="hr-director", department="People", salary=120000)--这是你唯一直接招聘的角色。'
                 )
-            # HR 已就位: 招工程师/设计师归 HR，CEO 不再 create_agent 招人
+            # HR is in place: hiring engineers/designers is HR's job, CEO no longer create_agent to hire
             if "senior-engineer" not in roles or "junior-engineer" not in roles:
                 return (
                     "HR 已就位。招聘 senior-engineer 与 junior-engineer 是 HR 的职责，"
@@ -248,7 +248,7 @@ class SimulatedAgentRunner:
             if "designer" not in roles and len(agents) < 5:
                 return "工程团队齐备，用 create_agent 招一名 designer。"
             return "团队齐备，**停止招聘**。可用 send_message 协助沟通。"
-        # 工程师/设计师
+        # Engineers / designers
         if tasks:
             ids = ", ".join(t.id for t in tasks)
             return (
@@ -258,7 +258,7 @@ class SimulatedAgentRunner:
             )
         return "暂无待办任务；用 send_message 向 CEO 请求任务。"
 
-    # ── 工具执行 (返回结果字符串供 LLM 下一轮参考) ──
+    # ── Tool execution (returns a result string for the LLM's next turn) ──
     async def _execute_tool(
         self, rt: _AgentRuntime, agent_id: str, profile: AgentProfile,
         name: str, args: dict, tick: int,
@@ -338,7 +338,7 @@ class SimulatedAgentRunner:
             learned = r.get("name") if isinstance(r, dict) and r.get("name") else None
             return f"已学习 Skill: {learned}" if learned else f"未找到与 '{args.get('query', '')}' 相关的 Skill"
 
-        # 未实现/桩工具 (web_search / write_code / write_file 等)
+        # Unimplemented / stub tools (web_search / write_code / write_file etc.)
         await self.hub.emit_frontend(
             {"type": "agent_action", "agent": profile.name, "action": name, "target": args.get("target")})
         logger.info("[%s] 桩工具 %s(%s)", profile.name, name, args)

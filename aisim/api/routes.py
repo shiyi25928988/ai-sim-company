@@ -1,4 +1,4 @@
-"""REST 路由 - Agent / 状态 / 仿真控制 / LLM / Skill (见 §三)。"""
+"""REST routes - Agent / state / simulation control / LLM / Skill (see §三)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from aisim.api.state import hub
 router = APIRouter(prefix="/api")
 
 
-# ═══ 请求模型 ═══
+# ═══ Request models ═══
 
 
 class CreateAgentRequest(BaseModel):
@@ -29,11 +29,11 @@ class SimulationControlRequest(BaseModel):
 
 class MeetingRequest(BaseModel):
     topic: str
-    participants: list[str]  # agent_id 列表
-    caller: str | None = None  # 主持者 agent_id (默认 CEO)
+    participants: list[str]  # list of agent_ids
+    caller: str | None = None  # host agent_id (defaults to CEO)
 
 
-# ═══ 健康 / 状态 ═══
+# ═══ Health / state ═══
 
 
 @router.get("/health")
@@ -80,7 +80,7 @@ async def delete_agent(agent_id: str) -> dict:
     return {"removed": agent_id}
 
 
-# ═══ 仿真控制 ═══
+# ═══ Simulation control ═══
 
 
 @router.post("/simulation/control")
@@ -90,7 +90,7 @@ async def simulation_control(req: SimulationControlRequest) -> dict:
     elif req.action == "pause":
         await hub.clock.stop()
     elif req.action == "step":
-        await hub.clock.stop()  # 单步前先暂停，避免与时钟 tick 冲突
+        await hub.clock.stop()  # pause before stepping to avoid conflicting with the clock tick
         await hub.step()
     elif req.action == "speed":
         if req.speed is None:
@@ -106,12 +106,12 @@ async def simulation_control(req: SimulationControlRequest) -> dict:
     }
 
 
-# ═══ LLM 网关 ═══
+# ═══ LLM gateway ═══
 
 
 @router.get("/llm/config")
 async def llm_config() -> dict:
-    """返回 LLM 路由配置 (不暴露 API Key)。"""
+    """Return the LLM routing config (does not expose the API Key)."""
     return {
         "provider": hub.config.llm.provider,
         "default_model": hub.config.llm.default_model,
@@ -121,7 +121,7 @@ async def llm_config() -> dict:
     }
 
 
-# ═══ Skill 池 ═══
+# ═══ Skill pool ═══
 
 
 @router.get("/skills")
@@ -131,7 +131,7 @@ async def list_skills() -> list[dict]:
 
 @router.get("/agents/{agent_id}/skills")
 async def agent_skills(agent_id: str) -> list[dict]:
-    """某 Agent 当前生效的 Skills (继承的 company/department/role/personal)。"""
+    """The Skills currently in effect for an Agent (inherited company/department/role/personal)."""
     state = await hub.agent_manager.get(agent_id)
     if state is None:
         raise HTTPException(status_code=404, detail=f"agent not found: {agent_id}")
@@ -141,7 +141,7 @@ async def agent_skills(agent_id: str) -> list[dict]:
     return [hub.skill_pool.to_dict(s) for s in skills]
 
 
-# ═══ 任务 ═══
+# ═══ Tasks ═══
 
 
 @router.get("/tasks")
@@ -149,12 +149,12 @@ async def list_tasks() -> list[dict]:
     return await hub.task_manager.list_dicts()
 
 
-# ═══ 会议 ═══
+# ═══ Meeting ═══
 
 
 @router.post("/meetings")
 async def create_meeting(req: MeetingRequest) -> dict:
-    """手动召集一场 LLM 主持的会议，返回纪要。"""
+    """Manually convene an LLM-hosted meeting and return the minutes."""
     caller = req.caller or hub.config.ceo.agent_id
     minutes = await hub.call_meeting(caller, req.topic, req.participants)
     return {"topic": req.topic, "participants": req.participants, "minutes": minutes[:1000]}

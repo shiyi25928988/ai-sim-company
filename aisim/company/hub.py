@@ -1,10 +1,10 @@
-"""CompanyHub 主类 - 串联所有中枢组件 (见 §三)。
+"""CompanyHub main class - wires together all core components (see §三).
 
-运行时:
-- 连接 Redis，下发 CEO Profile 并登记运行态。
-- 仿真时钟每 Tick: 广播 simulation:tick 给 Agent + 推送 state_snapshot 给前端。
-- 监听 Agent 上报 (register/ready/offline/heartbeat/action/skill:new) 并维护状态。
-- 对外提供 create_agent / remove_agent / snapshot 供 REST 接口调用。
+Runtime:
+- Connect to Redis, push the CEO Profile and register its runtime state.
+- Each simulation clock Tick: broadcast simulation:tick to Agents + push state_snapshot to the frontend.
+- Listen for Agent reports (register/ready/offline/heartbeat/action/skill:new) and maintain state.
+- Expose create_agent / remove_agent / snapshot for the REST layer to call.
 """
 
 from __future__ import annotations
@@ -43,46 +43,46 @@ logger = logging.getLogger(__name__)
 
 
 class CompanyHub:
-    """Company App - 系统的中枢。前端 (Phaser) + 后端 (FastAPI) 一体。"""
+    """Company App - the core of the system. Frontend (Phaser) + backend (FastAPI) in one."""
 
     def __init__(self, config: Config) -> None:
         self.config = config
 
-        # 通信 (先行，供其它组件注入)
+        # Communication (initialized first, injected into other components)
         self.message_bus = MessageBus()
         self.meeting_system = MeetingSystem()
 
-        # 仿真
+        # Simulation
         self.clock = SimulationClock(interval_ms=config.simulation.tick_interval_ms)
         self.economy = EconomyEngine(initial_capital=config.company.initial_capital)
         self.event_bus = EventBus()
 
-        # Agent 管理
+        # Agent management
         self.agent_manager = AgentManager(self.message_bus)
         self.agent_runner = SimulatedAgentRunner(self)
         self.profile_registry = ProfileRegistry(self.message_bus)
         self.org_chart = OrgChart()
 
-        # 任务
+        # Tasks
         self.task_manager = TaskManager(self.message_bus)
 
         # LLM
         self.llm_gateway = LLMGateway(config.llm)
 
-        # 知识
+        # Knowledge
         self.skill_pool = SkillPool(self.message_bus)
         self.llm_gateway.skill_pool = self.skill_pool
 
-        # 持久化 (Hub 内存态: tick/经济/用量)
+        # Persistence (Hub in-memory state: tick/economy/usage)
         self.db = Database()
 
-        # 前端事件出口 (由 api 层注入 ws_manager.broadcast)
+        # Frontend event outlet (api layer injects ws_manager.broadcast)
         self.on_frontend_event: Callable[[dict], Awaitable[None]] | None = None
 
         self._stale_task: asyncio.Task | None = None
         self._started = False
 
-    # ═══ 生命周期 ═══
+    # ═══ Lifecycle ═══
     async def start(self) -> None:
         if self._started:
             return
@@ -125,7 +125,7 @@ class CompanyHub:
         self._started = False
 
     async def _seed_ceo(self) -> None:
-        """公司创立: CEO 即存在 (本地 simulated 模式直接登记)。"""
+        """Company founding: the CEO exists immediately (registered directly in local simulated mode)."""
         ceo_id = self.config.ceo.agent_id
         if await self.agent_manager.get(ceo_id) is not None:
             logger.info("CEO 已存在，跳过 seed: %s", ceo_id)
@@ -139,11 +139,11 @@ class CompanyHub:
         logger.info("CEO 已就位: %s (%s)", profile.name, profile.agent_id)
 
     async def _rehydrate_agents(self) -> None:
-        """从 Redis 重建 runner 的 Agent 注册表 (Hub 重启后恢复思考能力)。
+        """Rebuild the runner's Agent registry from Redis (restore thinking ability after Hub restart).
 
-        Redis 里的 Agent (AOF 持久化) 重启后仍在，但 runner 的内存注册表丢失；
-        此处把所有 simulated Agent 重新注册到 runner，使其恢复思考。
-        (Agent 记忆是内存态，不恢复；profile/role/skills 从 Redis 恢复。)
+        Agents in Redis (AOF-persisted) survive a restart, but the runner's in-memory registry is lost;
+        here we re-register all simulated Agents into the runner so they resume thinking.
+        (Agent memory is in-memory and is not restored; profile/role/skills are restored from Redis.)
         """
         if self.agent_manager.mode != "simulated":
             return
@@ -162,10 +162,10 @@ class CompanyHub:
 
     # ═══ Tick ═══
     async def on_tick(self, tick: int, await_agents: bool = False) -> None:
-        """每 Tick: 广播时钟 -> 结算经济 -> 持久化 -> 推送前端快照 -> 驱动 Agent 思考。
+        """Each Tick: broadcast clock -> settle economy -> persist -> push frontend snapshot -> drive Agent thinking.
 
-        await_agents=False (播放模式): 并发 fire-and-forget (快)。
-        await_agents=True (单步模式): 顺序+间隔 await (可观察节奏)。
+        await_agents=False (play mode): concurrent fire-and-forget (fast).
+        await_agents=True (step mode): sequential + interval await (observable pace).
         """
         await self.message_bus.broadcast_tick(tick)
         self.economy.apply_tick(tick)
@@ -178,15 +178,15 @@ class CompanyHub:
         if await_agents:
             await self.agent_runner.run_tick_sequential(tick)
         else:
-            await self.agent_runner.on_tick(tick)  # simulated 模式下托管 Agent 主循环
+            await self.agent_runner.on_tick(tick)  # host the Agent main loop in simulated mode
 
     async def step(self) -> None:
-        """单步: 推进一个 tick 并顺序执行 Agent (可观察)，供手动节奏控制。"""
+        """Single step: advance one tick and run Agents sequentially (observable), for manual pace control."""
         self.clock.tick += 1
         await self.on_tick(self.clock.tick, await_agents=True)
 
     def _restore_state(self) -> None:
-        """从 SQLite 恢复 Hub 内存态 (tick/经济/用量)。"""
+        """Restore Hub in-memory state from SQLite (tick/economy/usage)."""
         saved = self.db.load_json("hub_state")
         if not saved:
             return
@@ -212,7 +212,7 @@ class CompanyHub:
                 logger.exception("stale 检查异常")
             await asyncio.sleep(5)
 
-    # ═══ Agent 事件处理 (Agent -> Hub) ═══
+    # ═══ Agent event handling (Agent -> Hub) ═══
     async def handle_agent_event(self, event: dict) -> None:
         ch = event.get("_channel")
         if ch == channels.AGENT_REGISTER:
@@ -234,7 +234,7 @@ class CompanyHub:
             logger.debug("未处理事件: %s", ch)
 
     async def _on_agent_register(self, event: dict) -> None:
-        """Agent 容器报到 -> 下发其 Profile (docker 模式)。"""
+        """Agent container reports in -> push its Profile (docker mode)."""
         agent_id = event.get("agent_id")
         if not agent_id:
             return
@@ -246,7 +246,7 @@ class CompanyHub:
         await self.agent_manager.set_status(agent_id, AgentStatus.INITIALIZING)
 
     async def _on_hub_action(self, event: dict) -> None:
-        """Agent 动作汇报 -> 转发前端渲染事件。"""
+        """Agent action report -> forward as a frontend render event."""
         sender = event.get("sender") or event.get("agent_id") or "unknown"
         content = event.get("content", "")
         await self.emit_frontend(
@@ -258,7 +258,7 @@ class CompanyHub:
             }
         )
 
-    # ═══ 对外接口 (供 REST 调用) ═══
+    # ═══ External interface (for REST to call) ═══
     async def create_agent(
         self,
         name: str,
@@ -268,7 +268,7 @@ class CompanyHub:
         personality: dict | Personality | None = None,
         report_to: str | None = None,
     ) -> dict:
-        """创建一个新 Agent (CEO/HR 调用 create_agent 工具的落地)。"""
+        """Create a new Agent (the landing of the create_agent tool called by CEO/HR)."""
         agent_id = _make_agent_id(role, name)
         persona = personality_from_dict(personality)
         report_to = report_to or self.config.ceo.agent_id
@@ -281,11 +281,11 @@ class CompanyHub:
         self.economy.add_salary(salary)
 
         if self.agent_manager.mode == "docker":
-            # 容器启动后会自行报到 -> _on_agent_register 下发 Profile
+            # Container reports in on its own after starting -> _on_agent_register pushes the Profile
             await self.agent_manager.create_container(agent_id, self.config.redis_url)
             await self.agent_manager.register(profile, AgentStatus.BOOTING, simulated=False)
         else:
-            # simulated: 直接登记为 READY，并下发 Profile (供潜在的真实容器/调试订阅)
+            # simulated: register directly as READY and push the Profile (for potential real containers / debug subscriptions)
             await self.agent_manager.register(profile, AgentStatus.READY, simulated=True)
             await self.profile_registry.publish(profile)
             self.agent_runner.register(profile)
@@ -304,7 +304,7 @@ class CompanyHub:
         await self.profile_registry.remove(agent_id)
         logger.info("移除 Agent: %s", agent_id)
 
-    # ═══ 任务 ═══
+    # ═══ Tasks ═══
     async def create_task(
         self,
         title: str,
@@ -315,7 +315,7 @@ class CompanyHub:
         priority: str = "normal",
         created_by: str = "",
     ) -> dict:
-        """CEO/HR 创建任务并派发 (按角色或具体 Agent)。"""
+        """CEO/HR create a task and dispatch it (by role or by specific Agent)."""
         task = await self.task_manager.create(
             title=title,
             description=description,
@@ -339,7 +339,7 @@ class CompanyHub:
         return TaskManager.to_dict(task)
 
     async def complete_task(self, task_id: str, agent_id: str, result: str) -> dict | None:
-        """Agent 完成任务 (认领 + 标记 done + 记录汇报)。"""
+        """Agent completes a task (claim + mark done + record the report)."""
         task = await self.task_manager.complete(task_id, agent_id, result, self.clock.tick)
         if task is None:
             return None
@@ -358,7 +358,7 @@ class CompanyHub:
     async def share_skill(
         self, source_agent_id: str, name: str, prompt_injection: str, target_role: str
     ) -> dict:
-        """Senior 把经验提炼成 ROLE 级 Skill 发布给某角色 (该角色全员继承)。"""
+        """A senior distills experience into a ROLE-level Skill and publishes it to a role (inherited by all members of that role)."""
         slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:24] or "skill"
         skill = Skill(
             id=f"skill-{self.clock.tick}-{slug}",
@@ -376,7 +376,7 @@ class CompanyHub:
         return SkillPool.to_dict(skill)
 
     async def learn_skill(self, agent_id: str, query: str) -> dict:
-        """Junior 从公司池搜索并学习一个 Skill (个人副本)。"""
+        """A junior searches the company pool and learns a Skill (personal copy)."""
         results = await self.skill_pool.search(query)
         if not results:
             return {"learned": None, "query": query}
@@ -397,12 +397,12 @@ class CompanyHub:
         logger.info("[%s] 学习 Skill: %s", agent_id, src.name)
         return SkillPool.to_dict(skill)
 
-    # ═══ 会议 ═══
+    # ═══ Meeting ═══
     async def call_meeting(self, caller_id: str, topic: str, participants: list[str]) -> str:
-        """召集并 LLM 主持一场会议，返回纪要 (见 §六)。
+        """Convene and have an LLM host a meeting, return the minutes (see §六).
 
-        participants 为 agent_id 列表; 解析为名字后推 meeting_start (前端移人)，
-        LLM 主持产出纪要，广播给参会者并推 meeting_minutes。
+        participants is a list of agent_ids; resolved to names then meeting_start is pushed (frontend moves people),
+        the LLM hosts and produces minutes, which are broadcast to participants and pushed as meeting_minutes.
         """
         parts: list[dict] = []
         names: list[str] = []
@@ -422,7 +422,7 @@ class CompanyHub:
         if host is None:
             host = self.profile_registry.generate_ceo_profile(self.config)
         minutes = await self.meeting_system.run(meeting, parts, host, self.llm_gateway)
-        # 纪要广播给全员
+        # Broadcast minutes to everyone
         await self.message_bus.broadcast_announcement(
             caller_id, f"[会议纪要:{topic}]\n{minutes}"
         )
@@ -434,9 +434,9 @@ class CompanyHub:
         return minutes
 
     async def snapshot(self) -> dict:
-        """全量状态快照 (供 GET /api/state 与前端 state_snapshot)。"""
+        """Full state snapshot (for GET /api/state and the frontend state_snapshot)."""
         agents = await self.agent_manager.list()
-        # 附上每个 Agent 最近的思考/动作 (可观测性)
+        # Attach each Agent's recent thoughts/actions (observability)
         for a in agents:
             a["recent"] = self.agent_runner.recent_memory(a.get("agent_id", ""), 5)
         return {
@@ -462,7 +462,7 @@ class CompanyHub:
             "economy": snap["economy"],
         }
 
-    # ═══ 前端事件 ═══
+    # ═══ Frontend events ═══
     async def emit_frontend(self, event: dict) -> None:
         if self.on_frontend_event is not None:
             try:

@@ -1,11 +1,11 @@
-"""LLM Provider - OpenAI 兼容 (见 §七)。
+"""LLM Provider - OpenAI compatible (see §七).
 
-用 httpx 直连任意 OpenAI 兼容的 /chat/completions 端点:
-- 官方 OpenAI (base_url=https://api.openai.com/v1)
-- 代理 (one-api / new-api，可同时转发 gpt 与 claude 系列)
-- 国产 OpenAI 兼容服务 (DeepSeek / 智谱 GLM / Moonshot 等)
+Uses httpx to talk directly to any OpenAI-compatible /chat/completions endpoint:
+- Official OpenAI (base_url=https://api.openai.com/v1)
+- Proxies (one-api / new-api, can forward both gpt and claude families)
+- Domestic OpenAI-compatible services (DeepSeek / Zhipu GLM / Moonshot etc.)
 
-Agent 不感知 provider; 只需 Company Hub 配一次 LLM_API_KEY (与可选 LLM_BASE_URL)。
+Agents are unaware of the provider; Company Hub only needs LLM_API_KEY configured once (plus optional LLM_BASE_URL).
 """
 
 from __future__ import annotations
@@ -22,11 +22,11 @@ DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 
 class LLMError(RuntimeError):
-    """LLM 调用失败 (HTTP / 鉴权 / 解析)。"""
+    """LLM call failure (HTTP / auth / parsing)."""
 
 
 class OpenAICompatibleProvider:
-    """OpenAI 兼容的 chat completions provider。"""
+    """OpenAI-compatible chat completions provider."""
 
     def __init__(
         self,
@@ -36,7 +36,7 @@ class OpenAICompatibleProvider:
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.api_key = api_key
-        # base_url 优先级: 显式传入 > LLM_BASE_URL 环境变量 > 官方默认
+        # base_url precedence: explicit arg > LLM_BASE_URL env var > official default
         self.base_url = (base_url or os.environ.get("LLM_BASE_URL", "") or DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout
         client_kwargs: dict[str, Any] = {"timeout": timeout}
@@ -51,8 +51,8 @@ class OpenAICompatibleProvider:
         messages: list[dict],
         tools: list[dict] | None = None,
     ):
-        """调用 /chat/completions，返回 LLMResponse。失败抛 LLMError。"""
-        from aisim.llm.gateway import LLMResponse  # 延迟导入避免循环
+        """Call /chat/completions and return an LLMResponse. Raises LLMError on failure."""
+        from aisim.llm.gateway import LLMResponse  # lazy import to avoid circularity
 
         if not self.api_key:
             raise LLMError("LLM_API_KEY 未配置")

@@ -1,12 +1,12 @@
-"""LLM 统一网关 - 公司级 LLM 接入 (见 §七)。
+"""Unified LLM gateway - company-level LLM access (see §七).
 
-职责:
-1. 按角色选模型 (router)
-2. 预算检查 (超额回退最便宜模型)
-3. 动态组装 System Prompt (身份 + 公司上下文 + Skills)
-4. 调用 provider (OpenAI 兼容) 并记账
+Responsibilities:
+1. Select model by role (router)
+2. Budget check (fall back to the cheapest model when exceeded)
+3. Dynamically assemble the System Prompt (identity + company context + Skills)
+4. Call the provider (OpenAI compatible) and keep the books
 
-API Key 只在 Company Hub 配一次; Agent 不感知自己用什么模型。
+The API Key is configured once in Company Hub; Agents are unaware which model serves them.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LLMResponse:
-    """LLM 返回。"""
+    """LLM response."""
 
     content: str
     tool_calls: list[dict] | None = None
@@ -38,27 +38,27 @@ class LLMResponse:
 
 
 class LLMGateway:
-    """公司级 LLM 网关。Agent 不携带 LLM 配置，调用全部走这里。"""
+    """Company-level LLM gateway. Agents carry no LLM config; all calls go through here."""
 
     def __init__(self, config: LLMConfig, provider: OpenAICompatibleProvider | None = None) -> None:
         self.config = config
         self.router = ModelRouter(config)
         self.daily_budget = config.daily_budget
         self.usage_today = 0
-        # 可注入 provider (测试用 MockTransport); 否则按 config 创建
+        # Provider is injectable (MockTransport for tests); otherwise created from config
         self.provider = provider or OpenAICompatibleProvider(
             api_key=config.api_key, base_url=config.base_url
         )
-        # 公司 Skill Pool (由 Hub 注入; 注入 Skills 到 System Prompt)
+        # Company Skill Pool (injected by the Hub; injects Skills into the System Prompt)
         self.skill_pool = None
 
     async def chat(
         self, agent_profile: AgentProfile, messages: list, tools: list | None = None
     ) -> LLMResponse:
-        # 1. 按角色选模型
+        # 1. Select model by role
         model = self.router.select(agent_profile.role)
 
-        # 2. 预算硬上限: 超限即停 (控成本，避免失控计费)
+        # 2. Hard budget cap: stop when exceeded (cost control, avoids runaway billing)
         if self.daily_budget > 0 and self.usage_today > self.daily_budget:
             logger.warning("LLM 预算超限: usage=%d > budget=%d，暂停调用", self.usage_today, self.daily_budget)
             return LLMResponse(
@@ -67,13 +67,13 @@ class LLMGateway:
                 model=model,
             )
 
-        # 3. 组装 System Prompt (身份 + 公司上下文 + Skills)
+        # 3. Assemble the System Prompt (identity + company context + Skills)
         system_prompt = await self._build_system_prompt(agent_profile)
 
-        # 4. 工具 -> OpenAI function schema (端点不支持 function-calling 时整体不发)
+        # 4. Tools -> OpenAI function schema (omitted entirely when the endpoint has no function-calling support)
         tool_schemas = self._resolve_tools(tools or []) if self.config.enable_tools else []
 
-        # 5. 调用 provider
+        # 5. Call the provider
         try:
             response = await self.provider.chat(
                 model=model, system=system_prompt, messages=messages, tools=tool_schemas
@@ -87,11 +87,11 @@ class LLMGateway:
         return response
 
     async def _build_system_prompt(self, profile: AgentProfile) -> str:
-        """每次 Agent 调 LLM 前，动态组装 System Prompt (见 §七/§八)。
+        """Dynamically assemble the System Prompt before each Agent LLM call (see §七/§八).
 
-        优先渲染角色模板 prompts/{role}.j2 (身份 + 职责 + 行为约束)；
-        再注入该 Agent 生效的 Skills (company/department/role/personal) 的 prompt_injection。
-        实时状态 (资金/团队/任务) 由调用方放在 user message 里。
+        First renders the role template prompts/{role}.j2 (identity + responsibilities + behavior constraints);
+        then injects the prompt_injection of the Agent's effective Skills (company/department/role/personal).
+        Live state (funds/team/tasks) is placed in the user message by the caller.
         """
         base = profile.system_prompt or self._render_role_template(profile)
 
@@ -108,7 +108,7 @@ class LLMGateway:
         return f"{base}\n\n{skill_text}".strip() if skill_text else base
 
     def _render_role_template(self, profile: AgentProfile) -> str:
-        """渲染 prompts/{role}.j2；失败则回退到 identity block。"""
+        """Render prompts/{role}.j2; fall back to the identity block on failure."""
         import os
 
         from aisim.agent.identity import build_identity_block
@@ -127,9 +127,9 @@ class LLMGateway:
         return tmpl.render(profile=profile)
 
     def _resolve_tools(self, tools: list) -> list[dict]:
-        """把工具列表归一为 OpenAI function-calling schema。
+        """Normalize a tool list into OpenAI function-calling schemas.
 
-        接受: BaseTool 实例 / 已是 schema 的 dict / 工具名 (str)。
+        Accepts: BaseTool instances / dicts that are already schemas / tool names (str).
         """
         from aisim.tools import BaseTool, all_tools
 

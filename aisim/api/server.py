@@ -1,6 +1,6 @@
-"""FastAPI 入口 - aisim.api.server:app (见 §十三)。
+"""FastAPI entry point - aisim.api.server:app (see §十三).
 
-启动时拉起 CompanyHub; 暴露 REST 路由 + WebSocket。
+Starts the CompanyHub on startup; exposes REST routes + WebSocket.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO)
-    # 把 WebSocket 广播器注入 Hub，使 Tick/Agent 事件能推到前端
+    # Inject the WebSocket broadcaster into the Hub so Tick/Agent events can be pushed to the frontend
     hub.on_frontend_event = ws_manager.broadcast
     logger.info("CompanyHub 启动...")
     try:
@@ -34,8 +34,8 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="ai-sim-company Company Hub", version="0.1.0", lifespan=lifespan)
-    # 允许前端 (如 localhost:3000/3007) 跨域访问 REST; WS 不受 CORS 限制。
-    # 生产环境应改成具体 origin。
+    # Allow the frontend (e.g. localhost:3000/3007) to access REST cross-origin; WS is not subject to CORS.
+    # In production this should be changed to specific origins.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

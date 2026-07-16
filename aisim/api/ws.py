@@ -1,7 +1,7 @@
-"""WebSocket 管理 - 前端实时通信 (见 §六 前端 WS 协议)。
+"""WebSocket management - real-time frontend communication (see §六 frontend WS protocol).
 
-Hub 把渲染事件 (agent_message / agent_action / agent_created /
-meeting_start / state_snapshot) 广播到所有连接的前端。
+The Hub broadcasts render events (agent_message / agent_action / agent_created /
+meeting_start / state_snapshot) to all connected frontends.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ ws_router = APIRouter()
 
 
 class WebSocketManager:
-    """管理前端 WebSocket 连接并广播渲染事件。"""
+    """Manages frontend WebSocket connections and broadcasts render events."""
 
     def __init__(self) -> None:
         self._connections: list[WebSocket] = []
@@ -33,7 +33,7 @@ class WebSocketManager:
             self._connections.remove(ws)
 
     async def broadcast(self, event: dict[str, Any]) -> None:
-        """广播一个渲染事件到所有前端 (见 §六 协议)。"""
+        """Broadcast a render event to all frontends (see §六 protocol)."""
         payload = json.dumps(event, default=str)
         dead = []
         for ws in self._connections:
@@ -53,7 +53,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await ws_manager.connect(websocket)
     try:
         while True:
-            # 前端可发控制指令 (播放/暂停/加速); 暂只保持连接
+            # The frontend may send control commands (play/pause/speed up); for now only keeps the connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)

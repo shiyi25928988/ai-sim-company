@@ -23,7 +23,7 @@ export function TaskBoard({ tasks }: { tasks: Task[] }) {
       {pending.map((t) => (
         <div key={t.id} className="mb-2 border-l-2 border-yellow-500 pl-2">
           <div className={STATUS_COLOR[t.status] ?? "text-gray-300"}>{t.title}</div>
-          <div className="text-gray-500">-> {t.assignee || t.assignee_role || "Unassigned"}</div>
+          <div className="text-gray-500">{"->"} {t.assignee || t.assignee_role || "Unassigned"}</div>
           {t.description && <div className="text-gray-600">{t.description.slice(0, 50)}</div>}
         </div>
       ))}

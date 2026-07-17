@@ -189,7 +189,8 @@ class SimulatedAgentRunner:
             f"{a['name']}({a['role']}, id={a.get('agent_id', a['name'])})" for a in agents
         ) or "(none)"
         eco = snapshot.get("economy", {})
-        recent = "\n".join(f"- {m.content}" for m in memory.recent(5)) or "(none)"
+        query = f"{company.business_description} {' '.join(t.title for t in tasks)}".strip()
+        recent = "\n".join(f"- {m.content}" for m in memory.recall(query, 5)) or "(none)"
         registered = set(all_tools().keys())
         tools = ", ".join(t for t in profile.tools if t in registered) or "(none)"
         directive = SimulatedAgentRunner._directive(profile, agents, tasks)

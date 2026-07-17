@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 TOOLS_BY_ROLE: dict[str, list[str]] = {
     "ceo": [
         "create_agent", "send_message", "call_meeting", "web_search",
-        "create_task", "view_finance", "set_strategy", "approve_budget",
+        "create_task", "view_finance", "set_strategy", "approve_budget", "create_skill",
     ],
     "hr-director": [
         "create_agent", "send_message", "call_meeting", "view_team",
@@ -27,15 +27,15 @@ TOOLS_BY_ROLE: dict[str, list[str]] = {
     ],
     "senior-engineer": [
         "complete_task", "send_message", "share_skill", "code_review", "web_search",
-        "write_file", "read_file", "list_files",
+        "write_file", "read_file", "list_files", "find_skill", "create_skill",
     ],
     "junior-engineer": [
         "complete_task", "send_message", "ask_for_help", "learn_skill",
-        "write_file", "read_file", "list_files",
+        "write_file", "read_file", "list_files", "find_skill",
     ],
     "designer": [
         "complete_task", "send_message", "web_search",
-        "write_file", "read_file", "list_files",
+        "write_file", "read_file", "list_files", "find_skill", "create_skill",
     ],
 }
 

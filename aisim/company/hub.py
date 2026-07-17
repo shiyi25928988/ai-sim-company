@@ -471,6 +471,15 @@ class CompanyHub:
         logger.info("[user] deleted Skill: %s (existed=%s)", skill_id, existed)
         return {"removed": skill_id, "existed": existed}
 
+    async def find_skill(self, query: str) -> list[dict]:
+        """Search published skills by keyword; return summaries (no copy created)."""
+        results = await self.skill_pool.search(query)
+        return [
+            {"name": s.name, "level": s.level.value, "scope": s.scope,
+             "description": s.description, "prompt_injection": s.prompt_injection[:200]}
+            for s in results
+        ]
+
     # ═══ Workspace files ═══
     def _ws_root(self, scope: str, agent_id: str | None = None) -> Path:
         base = Path(self.config.company.workspace_dir)

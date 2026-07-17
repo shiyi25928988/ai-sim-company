@@ -343,6 +343,30 @@ class SimulatedAgentRunner:
             learned = r.get("name") if isinstance(r, dict) and r.get("name") else None
             return f"Learned Skill: {learned}" if learned else f"No Skill found matching '{args.get('query', '')}'"
 
+        if name == "find_skill":
+            results = await self.hub.find_skill(args.get("query", ""))
+            if not results:
+                return "No skills found matching the query."
+            return "Found skills:\n" + "\n".join(
+                f"- {r['name']} [{r['level']}] scope={r['scope']}: {r['prompt_injection'][:80]}"
+                for r in results
+            )
+
+        if name == "create_skill":
+            r = await self.hub.create_skill(
+                name=args.get("name", ""),
+                description=args.get("description", ""),
+                prompt_injection=args.get("prompt_injection", ""),
+                category=args.get("category", "technical"),
+                level=args.get("level", "company"),
+                scope=args.get("scope", []),
+                created_by=profile.name,
+            )
+            await self.hub.emit_frontend(
+                {"type": "agent_action", "agent": profile.name,
+                 "action": f"create_skill {r.get('name', '')}"})
+            return f"Created skill '{r.get('name', '')}' (level={r.get('level', '')})"
+
         if name in ("write_file", "read_file", "list_files"):
             path = args.get("path", "").lstrip("/")
             scope = args.get("scope", "shared")

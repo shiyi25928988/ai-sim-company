@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from aisim.api.state import hub
@@ -190,6 +190,49 @@ async def create_skill(req: SkillRequest) -> dict:
 @router.delete("/skills/{skill_id}")
 async def delete_skill(skill_id: str) -> dict:
     return await hub.delete_skill(skill_id)
+
+
+@router.post("/skills/upload")
+async def upload_skill(file: UploadFile = File(...)) -> dict:
+    """Upload a skill package: a .zip containing skill.json (or skill.yaml) + optional prompt.md.
+
+    The json/yaml holds {name, description, category, level, scope, prompt_injection};
+    if prompt.md is present it overrides prompt_injection (for long rule text).
+    """
+    import io
+    import json
+    import zipfile
+
+    import yaml
+
+    data = await file.read()
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="not a valid zip file")
+    meta: dict = {}
+    prompt: str | None = None
+    with zf:
+        for n in zf.namelist():
+            base = n.split("/")[-1]
+            if base == "skill.json":
+                meta = json.loads(zf.read(n).decode("utf-8"))
+            elif base in ("skill.yaml", "skill.yml"):
+                meta = yaml.safe_load(zf.read(n).decode("utf-8")) or {}
+            elif base == "prompt.md":
+                prompt = zf.read(n).decode("utf-8")
+    if not meta:
+        raise HTTPException(status_code=400, detail="skill.json or skill.yaml not found in zip")
+    if prompt:
+        meta["prompt_injection"] = prompt
+    return await hub.create_skill(
+        name=meta.get("name", "Unnamed"),
+        description=meta.get("description", ""),
+        prompt_injection=meta.get("prompt_injection", ""),
+        category=meta.get("category", "technical"),
+        level=meta.get("level", "company"),
+        scope=meta.get("scope", []) or [],
+    )
 
 
 @router.get("/agents/{agent_id}/skills")

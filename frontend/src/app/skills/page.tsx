@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   useSkillsQuery,
   useCreateSkillMutation,
+  useUploadSkillMutation,
   useDeleteSkillMutation,
   type SkillRequestBody,
 } from "@/hooks/useQueries";
@@ -22,7 +23,7 @@ const EMPTY: SkillRequestBody = {
   scope: [],
 };
 
-/** /skills: list + upload (POST /api/skills) + delete. */
+/** /skills: list + create + upload package + delete. */
 export default function SkillsPage() {
   const { data: skills = [], isLoading } = useSkillsQuery();
   const toast = useToastStore((s) => s.push);
@@ -31,6 +32,7 @@ export default function SkillsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const createMut = useCreateSkillMutation();
+  const uploadMut = useUploadSkillMutation();
   const deleteMut = useDeleteSkillMutation();
 
   const submit = (e: React.FormEvent) => {
@@ -58,6 +60,16 @@ export default function SkillsPage() {
         },
       },
     );
+  };
+
+  const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    uploadMut.mutate(f, {
+      onSuccess: () => toast(`Uploaded ${f.name}.`, "success"),
+      onError: (err: Error) => toast(err.message, "error"),
+    });
+    e.target.value = "";
   };
 
   return (
@@ -105,97 +117,114 @@ export default function SkillsPage() {
           )}
         </section>
 
-        <section className="pixel-panel p-3 text-sm">
-          <h2 className="mb-2 text-base font-bold">Upload Skill</h2>
-          <form className="space-y-2 text-xs" onSubmit={submit}>
-            <label className="block">
-              Name
-              <input
-                className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Deployment Checklist"
-              />
-            </label>
-            <label className="block">
-              Description
-              <input
-                className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </label>
-            <label className="block">
-              Prompt injection (injected into agent system prompt)
-              <textarea
-                className="mt-1 h-20 w-full resize-y rounded border border-gray-600 bg-black/40 px-2 py-1"
-                value={form.prompt_injection}
-                onChange={(e) => setForm({ ...form, prompt_injection: e.target.value })}
-                placeholder="e.g. Run all tests before deploy; never push to main directly."
-              />
-            </label>
-            <div className="grid grid-cols-2 gap-2">
+        <section className="pixel-panel space-y-3 p-3 text-sm">
+          <div>
+            <h2 className="mb-2 text-base font-bold">Create Skill</h2>
+            <form className="space-y-2 text-xs" onSubmit={submit}>
               <label className="block">
-                Category
-                <select
-                  className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                Level
-                <select
-                  className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
-                  value={form.level}
-                  onChange={(e) => setForm({ ...form, level: e.target.value })}
-                >
-                  {LEVELS.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            {form.level !== "company" && (
-              <label className="block">
-                Scope (
-                {form.level === "department"
-                  ? "department names"
-                  : form.level === "role"
-                    ? "role names"
-                    : "agent_ids"}
-                , comma-separated)
+                Name
                 <input
                   className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
-                  value={scopeText}
-                  onChange={(e) => setScopeText(e.target.value)}
-                  placeholder={
-                    form.level === "department"
-                      ? "Engineering, Design"
-                      : form.level === "role"
-                        ? "senior-engineer, junior-engineer"
-                        : "ceo-alex, eng-jordan"
-                  }
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. Deployment Checklist"
                 />
               </label>
-            )}
-            {error && <p className="text-bad">{error}</p>}
-            <button
-              type="submit"
-              className="pixel-panel w-full py-1 hover:text-cyan-300"
-              disabled={createMut.isPending}
-            >
-              {createMut.isPending ? "Creating…" : "Create Skill"}
-            </button>
-          </form>
+              <label className="block">
+                Description
+                <input
+                  className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                />
+              </label>
+              <label className="block">
+                Prompt injection (injected into agent system prompt)
+                <textarea
+                  className="mt-1 h-20 w-full resize-y rounded border border-gray-600 bg-black/40 px-2 py-1"
+                  value={form.prompt_injection}
+                  onChange={(e) => setForm({ ...form, prompt_injection: e.target.value })}
+                  placeholder="e.g. Run all tests before deploy; never push to main directly."
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  Category
+                  <select
+                    className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  Level
+                  <select
+                    className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
+                    value={form.level}
+                    onChange={(e) => setForm({ ...form, level: e.target.value })}
+                  >
+                    {LEVELS.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {form.level !== "company" && (
+                <label className="block">
+                  Scope (
+                  {form.level === "department"
+                    ? "department names"
+                    : form.level === "role"
+                      ? "role names"
+                      : "agent_ids"}
+                  , comma-separated)
+                  <input
+                    className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
+                    value={scopeText}
+                    onChange={(e) => setScopeText(e.target.value)}
+                    placeholder={
+                      form.level === "department"
+                        ? "Engineering, Design"
+                        : form.level === "role"
+                          ? "senior-engineer, junior-engineer"
+                          : "ceo-alex, eng-jordan"
+                    }
+                  />
+                </label>
+              )}
+              {error && <p className="text-bad">{error}</p>}
+              <button
+                type="submit"
+                className="pixel-panel w-full py-1 hover:text-cyan-300"
+                disabled={createMut.isPending}
+              >
+                {createMut.isPending ? "Creating…" : "Create Skill"}
+              </button>
+            </form>
+          </div>
+
+          <div className="border-t border-gray-700 pt-3">
+            <h2 className="mb-1 text-base font-bold">Upload Skill Package</h2>
+            <p className="mb-2 text-xs text-gray-500">
+              .zip with skill.json (or skill.yaml) + optional prompt.md
+            </p>
+            <input
+              type="file"
+              accept=".zip"
+              onChange={onUpload}
+              disabled={uploadMut.isPending}
+              className="block w-full text-xs"
+            />
+            {uploadMut.isPending && <p className="mt-1 text-xs text-gray-500">Uploading…</p>}
+          </div>
         </section>
       </div>
     </main>

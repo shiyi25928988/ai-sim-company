@@ -18,6 +18,7 @@ company:
 llm:
   api_key: ${LLM_API_KEY}
   base_url: ${LLM_BASE_URL}
+  claude_code_enabled: true
   daily_budget: 2000000
   default_model: ${LLM_MODEL}
   enable_tools: ${LLM_TOOLS_ENABLED}

@@ -127,6 +127,19 @@ export const useCreateSkillMutation = () =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
   });
 
+export const useUploadSkillMutation = () =>
+  useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      const r = await fetch(`${API_URL}/api/skills/upload`, { method: "POST", body: form });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "upload failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
+  });
+
 export const useDeleteSkillMutation = () =>
   useMutation({
     mutationFn: async (skillId: string) => {

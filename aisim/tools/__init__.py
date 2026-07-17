@@ -66,6 +66,7 @@ from aisim.tools import (  # noqa: E402,F401  registration side effect
     file_ops,
     find_skill,
     learn_skill,
+    run_claude_code,
     send_message,
     share_skill,
     web_search,

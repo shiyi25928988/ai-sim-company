@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -393,6 +394,36 @@ class SimulatedAgentRunner:
                 return f"Dir not found: {path}"
             files = [f"{p.name}/" if p.is_dir() else p.name for p in sorted(full.iterdir())]
             return ", ".join(files) if files else "(empty)"
+
+        if name == "run_claude_code":
+            if not self.hub.config.llm.claude_code_enabled:
+                return "claude code is disabled; enable it in /settings."
+            claude_path = shutil.which("claude")
+            if not claude_path:
+                return "claude code CLI not found in PATH."
+            prompt = args.get("prompt", "")
+            cwd = str(Path(self.hub.config.company.workspace_dir).resolve())
+            await self.hub.emit_frontend(
+                {"type": "agent_action", "agent": profile.name,
+                 "action": f"run_claude_code: {prompt[:60]}"})
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    claude_path, "-p", prompt,
+                    cwd=cwd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                proc.kill()
+                return "claude code timed out (120s)."
+            except Exception as e:  # noqa: BLE001
+                return f"claude code failed: {e}"
+            out = stdout.decode("utf-8", errors="replace")[:2000] if stdout else ""
+            if out:
+                return f"claude code output:\n{out}"
+            err = stderr.decode("utf-8", errors="replace")[:300] if stderr else ""
+            return f"claude code produced no output (stderr: {err})"
 
         # Unimplemented / stub tools (web_search / write_code / write_file etc.)
         await self.hub.emit_frontend(

@@ -116,13 +116,45 @@ async def simulation_control(req: SimulationControlRequest) -> dict:
 @router.get("/llm/config")
 async def llm_config() -> dict:
     """Return the LLM routing config (does not expose the API Key)."""
+    import shutil
+
+    claude_path = shutil.which("claude")
     return {
         "provider": hub.config.llm.provider,
         "default_model": hub.config.llm.default_model,
         "routing": hub.config.llm.routing,
         "daily_budget": hub.config.llm.daily_budget,
         "usage_today": hub.llm_gateway.usage_today,
+        "claude_code": {
+            "installed": claude_path is not None,
+            "enabled": hub.config.llm.claude_code_enabled,
+            "path": claude_path,
+        },
     }
+
+
+class ClaudeCodeConfigRequest(BaseModel):
+    claude_code_enabled: bool
+
+
+@router.post("/llm/config")
+async def update_llm_config(req: ClaudeCodeConfigRequest) -> dict:
+    """Update the Claude Code enable flag (writes company.yaml + updates config in place)."""
+    import yaml
+    from pathlib import Path
+
+    cfg_path = Path("config/company.yaml")
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    existing: dict = {}
+    if cfg_path.exists():
+        existing = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    existing.setdefault("llm", {})["claude_code_enabled"] = req.claude_code_enabled
+    cfg_path.write_text(
+        yaml.safe_dump(existing, default_flow_style=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    hub.config.llm.claude_code_enabled = req.claude_code_enabled
+    return {"claude_code_enabled": req.claude_code_enabled}
 
 
 # ═══ Skill pool ═══

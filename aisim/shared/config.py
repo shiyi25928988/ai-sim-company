@@ -27,6 +27,7 @@ class LLMConfig:
     enable_tools: bool = True  # Whether to send function-calling tools to the LLM (turn off if the endpoint does not support them)
     max_iters: int = 3  # Max LLM<->tool loop rounds for a single Agent in a single tick (cost control)
     routing: dict[str, str] = field(default_factory=dict)  # Role -> model
+    claude_code_enabled: bool = False  # Whether agents may invoke the Claude Code CLI
 
 
 @dataclass
@@ -147,6 +148,8 @@ def load_config(path: str | Path = "config/company.yaml") -> Config:
             in ("1", "true", "yes", "on"),
             max_iters=int(_val(llm_raw, "max_iters", 3)),
             routing=llm_raw.get("routing", {}) or {},
+            claude_code_enabled=str(_val(llm_raw, "claude_code_enabled", "false")).lower()
+            in ("1", "true", "yes", "on"),
         ),
         simulation=SimulationConfig(
             tick_interval_ms=int(_val(sim_raw, "tick_interval_ms", 5000)),

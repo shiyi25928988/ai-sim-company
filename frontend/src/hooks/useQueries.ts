@@ -40,7 +40,27 @@ export interface LlmConfig {
   routing: Record<string, string>;
   daily_budget: number;
   usage_today: number;
+  claude_code: {
+    installed: boolean;
+    enabled: boolean;
+    path: string | null;
+  };
 }
+
+export const useUpdateClaudeCodeMutation = () =>
+  useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const r = await fetch(`${API_URL}/api/llm/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claude_code_enabled: enabled }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "update failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["llm-config"] }),
+  });
 
 export interface CompanyConfig {
   name: string;

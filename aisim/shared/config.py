@@ -43,6 +43,7 @@ class CompanyConfig:
     initial_capital: int = 500_000
     business_description: str = ""  # What the company does - injected into the CEO's tick prompt
     monthly_budget: int = 0  # Monthly budget cap (0 = unlimited)
+    workspace_dir: str = "data/workspace"  # Where agents write produced files (docs/code/etc.)
 
 
 @dataclass
@@ -127,6 +128,7 @@ def load_config(path: str | Path = "config/company.yaml") -> Config:
             initial_capital=int(_val(company_raw, "initial_capital", 500_000)),
             business_description=_val(company_raw, "business_description", ""),
             monthly_budget=int(_val(company_raw, "monthly_budget", 0)),
+            workspace_dir=_val(company_raw, "workspace_dir", "data/workspace"),
         ),
         ceo=CEOConfig(
             agent_id=_val(ceo_raw, "agent_id", "ceo-alex"),

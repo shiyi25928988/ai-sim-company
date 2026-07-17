@@ -27,12 +27,15 @@ TOOLS_BY_ROLE: dict[str, list[str]] = {
     ],
     "senior-engineer": [
         "complete_task", "send_message", "share_skill", "code_review", "web_search",
+        "write_file", "read_file", "list_files",
     ],
     "junior-engineer": [
         "complete_task", "send_message", "ask_for_help", "learn_skill",
+        "write_file", "read_file", "list_files",
     ],
     "designer": [
         "complete_task", "send_message", "web_search",
+        "write_file", "read_file", "list_files",
     ],
 }
 

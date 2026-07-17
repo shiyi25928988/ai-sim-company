@@ -133,6 +133,33 @@ async def list_skills() -> list[dict]:
     return await hub.skill_pool.list_dicts()
 
 
+class SkillRequest(BaseModel):
+    name: str
+    description: str = ""
+    prompt_injection: str = ""  # injected into the agent's system prompt
+    category: str = "technical"  # technical / management / creative / operations
+    level: str = "company"  # company / department / role / personal
+    scope: list[str] = []  # who inherits: department name / role / agent_id (by level)
+
+
+@router.post("/skills")
+async def create_skill(req: SkillRequest) -> dict:
+    """Upload a user skill (published immediately, inheritable by agents)."""
+    return await hub.create_skill(
+        name=req.name,
+        description=req.description,
+        prompt_injection=req.prompt_injection,
+        category=req.category,
+        level=req.level,
+        scope=req.scope,
+    )
+
+
+@router.delete("/skills/{skill_id}")
+async def delete_skill(skill_id: str) -> dict:
+    return await hub.delete_skill(skill_id)
+
+
 @router.get("/agents/{agent_id}/skills")
 async def agent_skills(agent_id: str) -> list[dict]:
     """The Skills currently in effect for an Agent (inherited company/department/role/personal)."""
@@ -172,6 +199,7 @@ class ConfigRequest(BaseModel):
     business_description: str = ""
     initial_capital: int = 500_000
     monthly_budget: int = 0  # 0 = unlimited
+    workspace_dir: str = "data/workspace"
 
 
 @router.get("/config")
@@ -183,6 +211,7 @@ async def get_config() -> dict:
         "business_description": c.business_description,
         "initial_capital": c.initial_capital,
         "monthly_budget": c.monthly_budget,
+        "workspace_dir": c.workspace_dir,
     }
 
 
@@ -204,6 +233,7 @@ async def update_config(req: ConfigRequest) -> dict:
         "business_description": req.business_description,
         "initial_capital": req.initial_capital,
         "monthly_budget": req.monthly_budget,
+        "workspace_dir": req.workspace_dir,
     }
     cfg_path.write_text(
         yaml.safe_dump(existing, default_flow_style=False, allow_unicode=True),
@@ -211,3 +241,19 @@ async def update_config(req: ConfigRequest) -> dict:
     )
     new_config = load_config(str(cfg_path))
     return await hub.apply_config(new_config)
+
+
+# ═══ Workspace files ═══
+
+
+@router.get("/files")
+async def list_files(path: str = "", scope: str = "shared") -> list[dict]:
+    return await hub.list_workspace(path, scope)
+
+
+@router.get("/files/content")
+async def read_file(path: str, scope: str = "shared") -> dict:
+    content = await hub.read_workspace(path, scope)
+    if content is None:
+        raise HTTPException(status_code=404, detail=f"file not found: {path}")
+    return {"path": path, "content": content}

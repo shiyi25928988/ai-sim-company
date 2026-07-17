@@ -19,6 +19,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from aisim.agent.memory import MemoryEntry, MemoryManager
 from aisim.shared.models import AgentProfile
@@ -341,6 +342,33 @@ class SimulatedAgentRunner:
                  "action": f"learn_skill: {args.get('query')}"})
             learned = r.get("name") if isinstance(r, dict) and r.get("name") else None
             return f"Learned Skill: {learned}" if learned else f"No Skill found matching '{args.get('query', '')}'"
+
+        if name in ("write_file", "read_file", "list_files"):
+            path = args.get("path", "").lstrip("/")
+            scope = args.get("scope", "shared")
+            base = Path(self.hub.config.company.workspace_dir)
+            sub = agent_id if scope == "personal" else "shared"
+            root = (base / sub).resolve()
+            full = (root / path).resolve()
+            if not str(full).startswith(str(root)):
+                return f"Path traversal blocked: {path}"
+            if name == "write_file":
+                content = args.get("content", "")
+                full.parent.mkdir(parents=True, exist_ok=True)
+                full.write_text(content, encoding="utf-8")
+                await self.hub.emit_frontend(
+                    {"type": "agent_action", "agent": profile.name,
+                     "action": f"write_file {sub}/{path}"})
+                return f"Wrote {len(content)} chars to {sub}/{path}"
+            if name == "read_file":
+                if not full.exists():
+                    return f"File not found: {path}"
+                return full.read_text(encoding="utf-8", errors="replace")[:4000]
+            # list_files
+            if not full.exists():
+                return f"Dir not found: {path}"
+            files = [f"{p.name}/" if p.is_dir() else p.name for p in sorted(full.iterdir())]
+            return ", ".join(files) if files else "(empty)"
 
         # Unimplemented / stub tools (web_search / write_code / write_file etc.)
         await self.hub.emit_frontend(

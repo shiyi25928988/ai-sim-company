@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from aisim.comm.meeting import MeetingSystem
@@ -442,6 +443,53 @@ class CompanyHub:
         await self.skill_pool.create(skill)
         logger.info("[%s] 学习 Skill: %s", agent_id, src.name)
         return SkillPool.to_dict(skill)
+
+    async def create_skill(
+        self, name: str, description: str, prompt_injection: str,
+        category: str, level: str, scope: list[str], created_by: str = "user",
+    ) -> dict:
+        """User-uploaded Skill (from the /skills page). Published immediately so agents can inherit it."""
+        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:24] or "skill"
+        skill = Skill(
+            id=f"skill-{self.clock.tick}-{slug}",
+            name=name,
+            category=SkillCategory(category),
+            level=SkillLevel(level),
+            scope=scope,
+            description=description,
+            prompt_injection=prompt_injection,
+            created_by=created_by,
+            status=SkillStatus.PUBLISHED,
+        )
+        await self.skill_pool.create(skill)
+        logger.info("[user] created Skill: %s (level=%s)", name, level)
+        return SkillPool.to_dict(skill)
+
+    async def delete_skill(self, skill_id: str) -> dict:
+        """Remove a user-uploaded Skill."""
+        existed = await self.skill_pool.delete(skill_id)
+        logger.info("[user] deleted Skill: %s (existed=%s)", skill_id, existed)
+        return {"removed": skill_id, "existed": existed}
+
+    # ═══ Workspace files ═══
+    def _ws_root(self, scope: str, agent_id: str | None = None) -> Path:
+        base = Path(self.config.company.workspace_dir)
+        sub = agent_id if scope == "personal" else "shared"
+        return (base / sub).resolve()
+
+    async def list_workspace(self, path: str, scope: str, agent_id: str | None = None) -> list[dict]:
+        root = self._ws_root(scope, agent_id)
+        full = (root / path.lstrip("/")).resolve()
+        if not str(full).startswith(str(root)) or not full.exists():
+            return []
+        return [{"name": p.name, "is_dir": p.is_dir()} for p in sorted(full.iterdir())]
+
+    async def read_workspace(self, path: str, scope: str, agent_id: str | None = None) -> str | None:
+        root = self._ws_root(scope, agent_id)
+        full = (root / path.lstrip("/")).resolve()
+        if not str(full).startswith(str(root)) or not full.exists() or full.is_dir():
+            return None
+        return full.read_text(encoding="utf-8", errors="replace")
 
     # ═══ Meeting ═══
     async def call_meeting(self, caller_id: str, topic: str, participants: list[str]) -> str:

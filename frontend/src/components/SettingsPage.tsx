@@ -47,7 +47,9 @@ export function SettingsPage() {
       </section>
       <section>
         <h3 className="mb-2 font-bold">Skill Pool</h3>
-        <p className="text-gray-400">(company-level skill review and publishing - TODO)</p>
+        <p className="text-gray-400">
+          <a href="/skills" className="text-cyan-300 hover:underline">Manage skills →</a> (upload / install / delete)
+        </p>
       </section>
     </div>
   );

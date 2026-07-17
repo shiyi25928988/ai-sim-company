@@ -47,6 +47,7 @@ export interface CompanyConfig {
   business_description: string;
   initial_capital: number;
   monthly_budget: number; // 0 = unlimited
+  workspace_dir: string;
 }
 
 export const useConfigQuery = () =>
@@ -74,4 +75,69 @@ export const useUpdateConfigMutation = () =>
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["skills"] });
     },
+  });
+
+export interface SkillRequestBody {
+  name: string;
+  description: string;
+  prompt_injection: string;
+  category: string;
+  level: string;
+  scope: string[];
+}
+
+export const useSkillsQuery = () =>
+  useQuery({
+    queryKey: ["skills"],
+    queryFn: () => fetchJson<Skill[]>("/api/skills"),
+  });
+
+export const useCreateSkillMutation = () =>
+  useMutation({
+    mutationFn: async (body: SkillRequestBody) => {
+      const r = await fetch(`${API_URL}/api/skills`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "create skill failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
+  });
+
+export const useDeleteSkillMutation = () =>
+  useMutation({
+    mutationFn: async (skillId: string) => {
+      const r = await fetch(`${API_URL}/api/skills/${skillId}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "delete skill failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
+  });
+
+export interface WorkspaceEntry {
+  name: string;
+  is_dir: boolean;
+}
+
+export const useFilesQuery = (path: string, scope: string) =>
+  useQuery({
+    queryKey: ["files", scope, path],
+    queryFn: () =>
+      fetchJson<WorkspaceEntry[]>(
+        `/api/files?path=${encodeURIComponent(path)}&scope=${scope}`,
+      ),
+  });
+
+export const useFileContentQuery = (path: string, scope: string) =>
+  useQuery({
+    queryKey: ["file-content", scope, path],
+    queryFn: () =>
+      fetchJson<{ path: string; content: string }>(
+        `/api/files/content?path=${encodeURIComponent(path)}&scope=${scope}`,
+      ),
+    enabled: !!path,
   });

@@ -15,6 +15,7 @@ const EMPTY: CompanyConfig = {
   business_description: "",
   initial_capital: 500_000,
   monthly_budget: 0,
+  workspace_dir: "data/workspace",
 };
 
 /** /setup: configure the company's business + budget; submitting hot-reloads the Hub. */
@@ -108,6 +109,17 @@ export default function SetupPage() {
                 />
               </label>
             </div>
+            <label className="block">
+              Workspace directory (where produced files are saved)
+              <input
+                className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
+                value={form.workspace_dir}
+                onChange={(e) =>
+                  setForm({ ...form, workspace_dir: e.target.value })
+                }
+                placeholder="e.g. data/workspace or D:/workspace/demo-ai"
+              />
+            </label>
             {error && <p className="text-bad">{error}</p>}
             <button
               type="submit"

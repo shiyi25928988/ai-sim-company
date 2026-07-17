@@ -70,6 +70,12 @@ class SkillPool:
             await self._save(s)
         return s
 
+    async def delete(self, skill_id: str) -> bool:
+        """Remove a Skill from the pool. Returns whether it existed."""
+        existed = await self.get(skill_id) is not None
+        await self.bus.hdel(channels.KEY_SKILLS, skill_id)
+        return existed
+
     async def get(self, skill_id: str) -> Skill | None:
         data = await self.bus.hget_json(channels.KEY_SKILLS, skill_id)
         return _from_dict(data) if data else None

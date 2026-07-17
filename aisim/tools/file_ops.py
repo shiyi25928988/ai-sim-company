@@ -1,56 +1,66 @@
-"""file_ops - shared file read/write (see §九 file storage)."""
+"""file_ops - workspace file read/write (see §九 file storage).
+
+In simulated mode these tools are executed by SimulatedAgentRunner._execute_tool,
+which writes to hub.config.company.workspace_dir (shared/ or {agent_id}/).
+"""
 
 from __future__ import annotations
 
 from aisim.tools import BaseTool, register
 
-SHARED_ROOT = "/workspace/shared"
-PERSONAL_ROOT_TEMPLATE = "/workspace/{agent_id}"
-
 
 class WriteFileTool(BaseTool):
     name = "write_file"
-    description = "写入文件到公司共享存储 (/workspace/shared)。"
+    description = "Write a file to the company workspace (produced docs / code / assets)."
     parameters = {
         "type": "object",
         "properties": {
-            "path": {"type": "string", "description": "相对于 /workspace/shared/ 的路径"},
+            "path": {"type": "string", "description": "Relative path under the workspace scope"},
             "content": {"type": "string"},
-            "scope": {"type": "string", "enum": ["shared", "personal"]},
+            "scope": {
+                "type": "string",
+                "enum": ["shared", "personal"],
+                "description": "shared = company-wide; personal = only this agent",
+            },
         },
         "required": ["path", "content"],
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: resolve the path and write to the Volume (prevent traversal)
+        # Executed by SimulatedAgentRunner._execute_tool in simulated mode.
         return {"status": "written", "path": kwargs.get("path")}
 
 
 class ReadFileTool(BaseTool):
     name = "read_file"
-    description = "从公司共享存储读取文件。"
+    description = "Read a file from the company workspace."
     parameters = {
         "type": "object",
-        "properties": {"path": {"type": "string"}},
+        "properties": {
+            "path": {"type": "string"},
+            "scope": {"type": "string", "enum": ["shared", "personal"]},
+        },
         "required": ["path"],
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: read the Volume file
         return {"status": "ok", "path": kwargs.get("path"), "content": ""}
 
 
 class ListFilesTool(BaseTool):
     name = "list_files"
-    description = "列出目录内容。"
+    description = "List files in a workspace directory."
     parameters = {
         "type": "object",
-        "properties": {"path": {"type": "string"}, "recursive": {"type": "boolean"}},
+        "properties": {
+            "path": {"type": "string"},
+            "scope": {"type": "string", "enum": ["shared", "personal"]},
+            "recursive": {"type": "boolean"},
+        },
         "required": ["path"],
     }
 
     async def execute(self, **kwargs):  # type: ignore[override]
-        # TODO: list the directory
         return {"status": "ok", "path": kwargs.get("path"), "files": []}
 
 

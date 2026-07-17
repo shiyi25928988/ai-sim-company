@@ -4,70 +4,92 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-This is a **greenfield project at the design stage**. The repository currently contains a single document — `ai-sim-company-架构设计.md` (in Chinese, ~49KB) — and no code, build system, dependencies, or tests have been written yet. There are no git commits.
+This project is **implemented and locally runnable** in a non-containerized simulation mode. The authoritative design spec is still `ai-sim-company-架构设计.md` (Chinese, ~49KB), but the current codebase has made three deliberate deviations from it (see "Implementation vs design" below). Treat the design doc as the long-term target; treat this file + the code as the current truth.
 
-Treat `ai-sim-company-架构设计.md` as the authoritative spec. When asked to implement anything, read that document first; the sections below summarize the decisions that constrain implementation but are not a substitute for it.
+What exists and runs today:
+- **Backend** (`aisim/`): FastAPI + Redis + SQLite, simulated agent runner, 6 role prompt templates, full REST + WebSocket API. `pytest`: 52 passed.
+- **Frontend** (`frontend/`): Next.js 15 + React 19 + Tailwind 4 + Zustand + TanStack Query, multi-route data-dashboard (Phaser removed).
+- **One-click launch**: `start.bat` / `stop.bat` / `reset.bat` (Windows) bring up Redis + backend (:8000) + frontend (:3000).
+- **Business setup**: `/setup` page + `POST /api/config` hot-reloads the Hub with user-supplied business description + budget.
 
 ## What this project is
 
-`ai-sim-company` is a **multi-agent AI company simulation platform**. The user configures initial conditions; a CEO agent (founded alone, LLM-driven) autonomously decides to hire; an HR Director agent designs candidate profiles and creates new agents; the company grows and runs in real time, visualized as a pixel-art office.
+`ai-sim-company` is a **multi-agent AI company simulation platform**. The user configures the business (name/description/budget) on `/setup`; a CEO agent (LLM-driven) autonomously decides to hire and assign work; an HR Director agent designs/creates other agents; the company runs in real time, observed via a data dashboard.
 
 - The user is a god-view observer and does **not** directly control agents.
-- The CEO makes real decisions via an LLM; the HR Director creates agents; **every agent runs in its own Docker container**.
-- Differentiator vs. prior work: agents are dynamically created Docker containers (not config-file / in-process), the CEO/HR do the creating, and the underlying agent runtime is **Hermes Agent (Nous Research)**.
+- The CEO makes real decisions via an LLM; the HR Director creates agents; in local mode every agent runs as an in-process simulated loop inside the Hub (not separate Docker containers).
+- Differentiator vs. the design doc's container target: the local dev path uses `AGENT_BACKEND=simulated` (Hub runs the agent tick loop directly). The Docker container path (`docker-compose.yml`, `Dockerfile.agent`) is retained but not used in the local flow.
 
-## Core architectural principles (non-obvious — must be respected)
+## Implementation vs design (three deviations)
 
-These are the load-bearing decisions in the design doc. Violating any of them changes the nature of the project:
+1. **Agent backend**: design = each agent in its own Docker container running Hermes runtime; **current = `simulated`** (Hub process runs the agent main loop, calling `LLMGateway.chat` directly). `aisim/company/agent_runner.py` is the simulated loop; `aisim/agent/` (runtime/memory/identity) is the container-side code kept for the Docker path.
+2. **Frontend**: design = Phaser 3 pixel office; **current = removed Phaser**, replaced with a multi-route data dashboard (HUD / tasks / logs / agents / settings). No Phaser/EasyStar/Howler dependencies.
+3. **Business setup**: design doc doesn't specify online config; **current = `/setup` page + `hub.apply_config` hot-reload** (stop -> clear Redis+SQLite -> reinit components -> start), injecting `business_description` + `monthly_budget` into the CEO's tick prompt.
 
-1. **Each agent is a separate Docker container** running its own Hermes runtime — never in-process threads or tasks of the hub.
-2. **The base agent image carries no identity.** Identity is 100% defined by two startup env vars only: `REDIS_URL` and `AGENT_ID`. No role/personality/system-prompt is baked into the image.
-3. **The Agent Profile is pushed at runtime by Company Hub** over Redis (`agent:{id}:profile`) when the agent boots and reports in. The container does not know who it is until the hub tells it.
-4. **The LLM API key is configured exactly once, in Company Hub.** Agents never see a key and never know which model serves them. All LLM calls are proxied through the hub gateway; role→model routing happens there (e.g. `ceo`→`gpt-4o`, `senior-engineer`→`gpt-4o-mini`), with a daily token budget and automatic fallback to the cheapest model when exceeded.
-5. **Redis Pub/Sub is the only inter-agent / agent↔hub transport.** No direct HTTP/RPC between agents. Channels follow a fixed naming convention (see the doc's "通信系统" section for the full table).
-6. **Two-layer Skill system with a strict split of responsibility:** Hermes (inside the agent container) **learns** — auto-extracts experience into skills, self-improves on feedback, FTS5 search, `agentskills.io`-compatible. The Company Skill Pool (in the hub, Redis-backed) **manages** — sharing, distribution, permission scoping (`company`/`department`/`role`/`personal` levels), versioning, and the `draft→published→deprecated→archived` lifecycle.
-7. **File storage is a shared Docker Volume** for MVP (`/workspace/shared` mounted by all agents, plus per-agent `/workspace/{agent_id}`). The design explicitly calls for a single adapter swap to MinIO/S3 later — keep file-tool logic behind an adapter so this stays a one-place change.
-8. **Company Hub's boundary:** it owns UI, the simulation clock, the economy, container orchestration, profile generation, the LLM gateway, the skill pool, message routing, and file storage. It does **not** make agent decisions, run agent code, or manage agent memory — those belong to the agent container.
+## Core architectural principles (load-bearing - still respected where applicable)
 
-## Container topology
+1. **Agents are decoupled from the Hub's decision-making.** The Hub orchestrates; agents make decisions via LLM. In simulated mode the agent loop runs in the Hub process, but the boundary (Hub doesn't decide for agents) is preserved.
+2. **Agent identity is runtime-defined, not baked into code.** Profile (role/personality/tools) comes from `ProfileRegistry`; in simulated mode it's registered directly rather than pushed over Redis, but the principle (no role hardcoded in agent code) holds.
+3. **LLM API key is configured exactly once** (`.env` / `config/company.yaml`), agents never see it. Role->model routing happens in `LLMGateway`. ✓ implemented.
+4. **Redis Pub/Sub is the only inter-agent / agent↔hub transport.** Channel naming in `aisim/shared/channels.py`. ✓ implemented (simulated agents still route messages through `MessageBus`).
+5. **Two-layer Skill system**: Hermes-side learning (not in simulated mode) + Hub-side `SkillPool` (sharing/scoping/versioning/lifecycle). The Hub side is implemented (`aisim/skills/`); agent-side auto-extraction is a Docker-mode feature.
+6. **File storage**: shared Docker volume in design; in local mode `tools/file_ops.py` is a stub. Keep file-tool logic behind an adapter for the future MinIO/S3 swap.
+7. **Company Hub's boundary**: owns UI/simulation clock/economy/orchestration/profile-gen/LLM gateway/skill pool/message routing/file storage. Does **not** make agent decisions or manage agent memory. ✓ respected.
 
-- **Two fixed containers** (defined in `docker-compose.yml`): `redis` (message backbone + state + skill pool) and `company` (Company Hub: FastAPI + Phaser UI + simulation + Docker-API orchestration + LLM gateway).
-- **N dynamic `agent:*` containers**, created/destroyed at runtime by Company Hub via the Docker API. The CEO agent is the one fixed agent (present at company founding); all others (HR, engineers, designer, …) are created dynamically by CEO/HR.
-- All containers share the `aisim-net` Docker network. The hub mounts `/var/run/docker.sock` so it can spawn agent containers.
+## Local dev topology
 
-## Intended stack
+- **Redis** (fixed, `:6379`, password `123456`): message backbone + state + skill pool.
+- **Company Hub** (`python -m uvicorn aisim.api.server:app --port 8000`): FastAPI + WebSocket + simulation + LLM gateway + simulated agent runner.
+- **Frontend** (`cd frontend && npm run dev`, `:3000`): Next.js dev server.
+- `start.bat` starts all three; `stop.bat` kills by port (8000/3000-3002); `reset.bat` clears Redis + SQLite + `.next`.
 
-- **Backend (Python 3.12):** FastAPI (`aisim/api/`), `aioredis`/`redis`, `httpx`, Hermes Agent runtime. Python package is `aisim/`.
-- **Frontend:** Next.js + React 19, **Phaser 3** (pixel office rendering + sprite animation state machine), **EasyStar.js** (A* pathfinding), Tailwind CSS 4, Howler.js (audio). Lives in `frontend/`.
-- **Infra:** Docker Compose, Redis 7-alpine.
+## Stack
 
-## Intended package layout (from the design doc)
+- **Backend (Python 3.12)**: FastAPI, `redis.asyncio`, `httpx`, `jinja2` (prompts), `pydantic`, `sqlite3`. Package `aisim/`.
+- **Frontend**: Next.js 15 (App Router) + React 19 + Tailwind CSS 4 + Zustand + TanStack Query. Lives in `frontend/`.
+- **Infra (design target, not local)**: Docker Compose, Redis 7-alpine.
 
-The `aisim/` Python package is organized by concern, not by layer:
-`company/` (hub, agent_manager, profile_registry, org_chart) · `agent/` (runtime entrypoint, memory, identity — runs **inside** the agent container) · `simulation/` (clock, economy, event_bus) · `comm/` (message_bus, meeting) · `skills/` (pool, sync, preset) · `llm/` (gateway, router, `prompts/*.j2` per role) · `tools/` (one file per agent tool, e.g. `create_agent.py`) · `api/` (FastAPI server, ws, routes) · `db.py` (SQLite persistence).
+## Package layout (current)
 
-Note the split: `aisim/company/*` runs in the hub; `aisim/agent/*` runs inside each agent container. Both are copied into the respective Dockerfiles (`Dockerfile.company`, `Dockerfile.agent`), and `aisim/shared/` is shared between them.
+`aisim/` organized by concern:
+`company/` (hub, agent_manager, **agent_runner** [simulated loop], task_manager, profile_registry, org_chart) · `agent/` (runtime, memory, identity — container-side, unused in simulated) · `simulation/` (clock, economy, event_bus) · `comm/` (message_bus, meeting) · `skills/` (pool, sync, preset) · `llm/` (gateway, router, provider, `prompts/*.j2` — 6 English templates) · `tools/` (one file per agent tool) · `api/` (server, ws, routes, state) · `db.py` (SQLite) · `shared/` (models, channels, config).
+
+`frontend/src/`:
+`app/` (page, layout, globals.css + `dashboard/` `settings/` `agents/[id]` `setup/`) · `components/` (HUD, ControlBar, TaskBoard, AgentPanel, LogFeed, TopNav, MeetingDialog, QueryProvider, GameProvider, Toaster, Skeleton, ...) · `hooks/` (useWebSocket, useGameEvents, useQueries) · `store/` (useGameStore [Zustand], useToastStore) · `lib/` (config, query-client) · `types/` (game).
 
 ## Agent lifecycle & communication contract
 
-Agent state machine: `booting → initializing → running → offline` / `shutting down`. Boot sequence (agent side): connect Redis → publish `agent:register` → subscribe `agent:{id}:profile` → receive Profile → init Hermes Runtime → subscribe `simulation:tick` + `agent:{id}:inbox` → publish `agent:ready` → enter tick loop. Heartbeat is 5s; the hub marks an agent offline after a 15s heartbeat timeout.
+Agent state machine: `booting -> initializing -> running -> offline` / `shutting down`. In simulated mode, agents skip the boot/register handshake (registered directly by `agent_runner`); in Docker mode the full handshake (subscribe `agent:{id}:profile`, publish `agent:register`, etc.) applies.
 
-Four communication modes: **DM** (1:1), **Channel** (1:N), **Meeting** (N:N, LLM-hosted), **Announcement** (1:All). Messages use a single `Message` schema with `type`/`sender`/`recipients`/`channel`/`content`/`content_type`/`priority`. The hub re-broadcasts renderable events to the frontend over WebSocket (`frontend:events`) with typed payloads (`agent_message`, `agent_action`, `agent_created`, `meeting_start`, `state_snapshot`).
+Four communication modes: **DM** (1:1), **Channel** (1:N), **Meeting** (N:N, LLM-hosted via `meeting.j2`), **Announcement** (1:All). Single `Message` schema. The Hub re-broadcasts renderable events to the frontend over WebSocket (`frontend:events`) with typed payloads (`agent_message`, `agent_action`, `agent_created`, `meeting_start`, `meeting_minutes`, `task_created`, `task_completed`, `state_snapshot`) — see `aisim/api/ws.py` and `frontend/src/types/game.ts` `FrontendEvent`.
 
 ## Tools & roles
 
-Tools are assigned **per role** (see `TOOLS_BY_ROLE` in the design doc, §四). Notable: `create_agent` is granted to **both** CEO and HR Director (either can spawn agents). Senior engineers can `share_skill` to juniors; juniors can `learn_skill` from the company pool. When adding a tool, update the role→tools mapping and confirm the hub's tool dispatcher knows it.
+Tools are assigned **per role** (see `TOOLS_BY_ROLE` in the design doc §四, and `aisim/tools/`). Notable: `create_agent` is granted to **both** CEO and HR Director. Senior engineers can `share_skill`; juniors can `learn_skill`. When adding a tool, update the role->tools mapping and confirm the hub's tool dispatcher (`agent_runner._execute_tool`) knows it.
 
-## Intended commands (not yet implemented)
+## Commands
 
-The design doc specifies these, but neither `docker-compose.yml` nor `Makefile` exist yet. Once created, they should match:
-- `docker compose up` — start redis + company + ceo (the design's "single-line launch").
-- Web UI at `http://localhost:3000`, WebSocket on `:8000`.
-- `LLM_API_KEY` must be set in the environment before `docker compose up`.
-- Makefile targets: `up`, `down`, `logs`, `logs-ceo`, `reset` (`down -v` + remove `data/`), `agent NAME=...` (manual debug-only agent spawn).
+```bat
+copy .env.example .env          :: fill LLM_API_KEY (+ optional LLM_MODEL/BASE_URL)
+start.bat                       :: Redis + backend :8000 + frontend :3000
+stop.bat                        :: kill backend/frontend by port
+reset.bat                       :: stop + clear Redis + SQLite + .next
+```
+
+```bat
+:: dev / tests
+pytest                          :: 52 passed, 2 skipped (live LLM needs LLM_LIVE_TEST=1)
+ruff check aisim tests
+mypy aisim
+cd frontend && npm run dev
+cd frontend && npx tsc --noEmit :: type check
+```
+
+Config files: `config/company.yaml` (business + CEO + LLM + simulation; `company` section hot-reloadable via `/setup`), `.env` (env vars, auto-loaded by `aisim/__init__.py`).
 
 ## Working in this repo
 
-- Before writing code, re-read the relevant section of `ai-sim-company-架构设计.md` — it contains concrete schemas (`AgentProfile`, `Skill`, `Message`), the full Redis channel table, the WebSocket protocol payloads, and the complete `docker-compose.yml` / `Makefile` / `Dockerfile.*` source as designed. Implement to those, don't re-derive them.
-- The design doc is in Chinese; code, identifiers, and commit messages should follow the conventions shown there (English identifiers, Chinese comments are acceptable where the doc uses them).
-- The MVP roadmap (§十四) phases the work: Phase 1 = infra + agent runtime + CEO `create_agent`; Phase 2 = pixel frontend; Phase 3 = economy/org/skills/meetings; Phase 4 = polish. Match the current phase when scoping changes.
+- The design doc `ai-sim-company-架构设计.md` is the authoritative long-term spec; this file reflects current implementation. When the two disagree, the code is truth for local mode, the doc is truth for the container target.
+- Code, identifiers, comments, and commit messages are **English**.
+- Before changing agent behavior, read `agent_runner._build_prompt` / `_directive` (role-specific guidance + business/budget injection) and the relevant `aisim/llm/prompts/*.j2`.
+- The LLM API key never goes in the frontend or agent-visible config. Configure via `.env` / `config/company.yaml`.

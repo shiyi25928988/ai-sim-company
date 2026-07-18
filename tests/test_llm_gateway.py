@@ -131,6 +131,27 @@ async def test_budget_guard_stops_calls():
     await gw.aclose()
 
 
+async def test_budget_minus_one_means_unlimited():
+    # daily_budget = -1 disables the cap: calls go through even when usage is huge.
+    from aisim.llm.gateway import LLMGateway
+    from aisim.shared.config import LLMConfig
+
+    transport = httpx.MockTransport(_ok_handler(content="ok", total_tokens=5))
+    provider = OpenAICompatibleProvider(
+        api_key="sk-test", base_url="https://example.com/v1", transport=transport
+    )
+    gw = LLMGateway(LLMConfig(api_key="sk-test", daily_budget=-1), provider=provider)
+    gw.usage_today = 9_999_999  # would blow past any positive budget
+    profile = AgentProfile(
+        agent_id="x", name="X", role="ceo", department="E", personality=Personality()
+    )
+    resp = await gw.chat(profile, [{"role": "user", "content": "hi"}], tools=None)
+    assert resp.error is None
+    assert resp.content == "ok"
+    assert gw.usage_today == 9_999_999 + 5  # call went through, usage increased
+    await gw.aclose()
+
+
 async def test_system_prompt_injects_skills():
     from aisim.llm.gateway import LLMGateway
     from aisim.shared.config import LLMConfig

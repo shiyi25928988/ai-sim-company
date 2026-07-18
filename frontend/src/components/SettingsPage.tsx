@@ -37,7 +37,7 @@ export function SettingsPage() {
           <div className="mt-2 space-y-1 text-xs">
             <div>Provider: {cfg.provider}</div>
             <div>Default model: {cfg.default_model}</div>
-            <div>Daily budget: {cfg.daily_budget.toLocaleString()} tokens</div>
+            <div>Daily budget: {cfg.daily_budget <= 0 ? "Unlimited" : `${cfg.daily_budget.toLocaleString()} tokens`}</div>
             <div>Usage today: {cfg.usage_today.toLocaleString()} tokens</div>
             <div className="mt-2">
               <div className="mb-1 text-gray-400">Role -&gt; model routing</div>

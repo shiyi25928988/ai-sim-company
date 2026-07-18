@@ -11,15 +11,16 @@ ceo:
   role: ceo
   salary: 0
 company:
-  business_description: Build a CLI tool for developers. Ship fast, charge 20 USD/mo.
-  initial_capital: 500000
+  business_description: 商业资讯公司，为个人创业者输出完整且严谨的市场调研报告
+  initial_capital: 50000000000
   monthly_budget: 80000
   name: Demo AI Co.
+  workspace_dir: D:\data\workspace
 llm:
   api_key: ${LLM_API_KEY}
   base_url: ${LLM_BASE_URL}
   claude_code_enabled: true
-  daily_budget: 2000000
+  daily_budget: ${LLM_DAILY_BUDGET}
   default_model: ${LLM_MODEL}
   enable_tools: ${LLM_TOOLS_ENABLED}
   max_iters: ${LLM_MAX_ITERS}

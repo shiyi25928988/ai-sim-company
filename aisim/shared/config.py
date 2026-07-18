@@ -23,7 +23,7 @@ class LLMConfig:
     api_key: str = ""
     base_url: str = ""  # OpenAI-compatible endpoint; empty uses official https://api.openai.com/v1
     default_model: str = "gpt-4o-mini"
-    daily_budget: int = 2_000_000  # Daily token budget
+    daily_budget: int = 2_000_000  # Daily token budget (-1 = unlimited; any value <= 0 disables the cap)
     enable_tools: bool = True  # Whether to send function-calling tools to the LLM (turn off if the endpoint does not support them)
     max_iters: int = 3  # Max LLM<->tool loop rounds for a single Agent in a single tick (cost control)
     routing: dict[str, str] = field(default_factory=dict)  # Role -> model

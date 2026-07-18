@@ -10,33 +10,24 @@ REM ====================================================================
 set ROOT=%~dp0
 cd /d %ROOT%
 
-REM --- Local dev environment (simulated agents, local Redis) ---
+REM --- Local dev environment (simulated agents; Redis config comes from .env) ---
 set AGENT_BACKEND=simulated
-set REDIS_HOST=localhost
-set REDIS_PORT=6379
-set REDIS_PASSWORD=123456
+REM Do NOT set REDIS_HOST/PORT/PASSWORD/DB here: .env is the single source of truth
+REM (aisim/__init__.py loads .env with override=False; a shell value would shadow it).
 
 if "!LLM_API_KEY!"=="" (
   echo [WARN] LLM_API_KEY not in env - if not set here, make sure .env has it.
   echo        Without it agent LLM calls will fail.
 )
 
-REM --- 1. Redis (checked via python redis client; redis-cli may not be on PATH) ---
+REM --- 1. Redis (reachability check against the host configured in .env) ---
 echo [1/3] Redis...
-python -c "import redis; redis.Redis(host='localhost',port=6379,password='123456').ping()" >nul 2>&1
+python -c "from dotenv import load_dotenv; import os,redis; load_dotenv('.env'); h=os.environ.get('REDIS_HOST','localhost'); p=int(os.environ.get('REDIS_PORT','6379')); pw=os.environ.get('REDIS_PASSWORD',''); db=int(os.environ.get('REDIS_DB','0')); redis.Redis(host=h,port=p,password=pw,db=db,socket_connect_timeout=3).ping(); print('reachable:',h,p,'db'+str(db))"
 if "!errorlevel!"=="0" (
-  echo       already running.
   goto :start_services
 )
-where redis-server >nul 2>&1
-if "!errorlevel!"=="0" (
-  echo       starting redis-server...
-  start "Redis" redis-server --port 6379 --requirepass 123456
-  timeout /t 2 >nul
-  goto :start_services
-)
-echo [ERROR] Redis not reachable on localhost:6379 and redis-server not in PATH.
-echo         Start Redis with password 123456 first, then re-run this script.
+echo [ERROR] Redis not reachable per .env (REDIS_HOST/PORT/PASSWORD/REDIS_DB).
+echo         Verify .env points to a running Redis, then re-run this script.
 exit /b 1
 
 :start_services

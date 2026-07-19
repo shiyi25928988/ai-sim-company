@@ -8,7 +8,7 @@ import { useToastStore } from "@/store/useToastStore";
 import { Skeleton } from "@/components/Skeleton";
 import { API_URL } from "@/lib/config";
 
-const ROLES = ["ceo", "hr-director", "senior-engineer", "junior-engineer", "designer"];
+const ROLES = ["ceo", "hr-director", "senior-engineer", "junior-engineer", "designer", "product-manager", "marketer", "data-analyst", "qa-engineer"];
 
 interface CreateBody {
   name: string;

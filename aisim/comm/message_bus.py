@@ -13,6 +13,13 @@ import logging
 from typing import Any, Awaitable, Callable
 
 from redis.asyncio import Redis
+from redis.asyncio.retry import Retry
+from redis.backoff import ExponentialBackoff
+from redis.exceptions import (
+    BusyLoadingError,
+    ConnectionError as RedisConnectionError,
+    TimeoutError as RedisTimeoutError,
+)
 
 from aisim.shared import channels
 from aisim.shared.models import Message, MessageType, Priority
@@ -39,7 +46,18 @@ class MessageBus:
 
     async def connect(self, redis_url: str) -> None:
         self._url = redis_url
-        self._redis = Redis.from_url(redis_url, decode_responses=True)
+        # Tolerate latency spikes on the Redis link (e.g. remote/LAN host with jitter):
+        # generous read timeout + retry-on-error with exponential backoff + periodic
+        # health checks so a stale connection is detected and rebuilt.
+        self._redis = Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=10,
+            retry_on_error=[BusyLoadingError, RedisConnectionError, RedisTimeoutError],
+            retry=Retry(ExponentialBackoff(cap=1.0, base=0.1), 3),
+            health_check_interval=30,
+        )
         await self._redis.ping()
         logger.info("MessageBus 已连接 Redis")
 

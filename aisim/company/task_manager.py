@@ -15,6 +15,10 @@ from aisim.shared.models import Task, TaskStatus
 
 logger = logging.getLogger(__name__)
 
+# Cap on persisted tasks; oldest (DONE first) are trimmed to bound HGETALL read size
+# (a multi-MB task hash read every tick caused read timeouts over a jittery LAN link).
+MAX_TASKS = 200
+
 
 def _task_id(title: str, tick: int) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:24] or "task"
@@ -75,6 +79,7 @@ class TaskManager:
             created_tick=tick,
         )
         await self.bus.hset_json(channels.KEY_TASKS, task.id, _to_dict(task))
+        await self._trim()
         logger.info("新任务: %s (派给 %s) by %s", title, assignee_role or assignee, created_by)
         return task
 
@@ -99,6 +104,30 @@ class TaskManager:
     async def get(self, task_id: str) -> Task | None:
         data = await self.bus.hget_json(channels.KEY_TASKS, task_id)
         return _from_dict(data) if data else None
+
+    async def _trim(self) -> None:
+        """Bound the task hash to MAX_TASKS so per-tick HGETALL stays small.
+
+        Evicts the oldest tasks when the pool exceeds the cap, dropping DONE tasks
+        first (history) and keeping pending/in_progress longer.
+        """
+        data = await self.bus.hgetall_json(channels.KEY_TASKS)
+        if len(data) <= MAX_TASKS:
+            return
+        items = [
+            (
+                tid,
+                int((v or {}).get("created_tick", 0) or 0),
+                (v or {}).get("status") == TaskStatus.DONE.value,
+            )
+            for tid, v in data.items()
+        ]
+        # evict DONE first, then oldest by created_tick
+        items.sort(key=lambda x: (not x[2], x[1]))
+        remove = [tid for tid, _, _ in items[: len(items) - MAX_TASKS]]
+        if remove:
+            await self.bus.hdel(channels.KEY_TASKS, *remove)
+            logger.info("任务保留: 清理 %d 个旧任务 (上限 %d)", len(remove), MAX_TASKS)
 
     async def list(self) -> list[Task]:
         data = await self.bus.hgetall_json(channels.KEY_TASKS)

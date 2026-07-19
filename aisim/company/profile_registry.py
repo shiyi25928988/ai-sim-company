@@ -37,6 +37,23 @@ TOOLS_BY_ROLE: dict[str, list[str]] = {
         "complete_task", "send_message", "web_search",
         "write_file", "read_file", "list_files", "find_skill", "create_skill", "run_claude_code",
     ],
+    "product-manager": [
+        "complete_task", "send_message", "call_meeting", "web_search", "create_task",
+        "write_file", "read_file", "list_files", "find_skill", "create_skill", "share_skill",
+    ],
+    "marketer": [
+        "complete_task", "send_message", "call_meeting", "web_search",
+        "write_file", "read_file", "list_files", "find_skill", "create_skill",
+    ],
+    "data-analyst": [
+        "complete_task", "send_message", "web_search",
+        "write_file", "read_file", "list_files", "find_skill", "create_skill", "run_claude_code",
+    ],
+    "qa-engineer": [
+        "complete_task", "send_message", "web_search",
+        "write_file", "read_file", "list_files", "find_skill", "learn_skill", "create_skill",
+        "share_skill", "run_claude_code",
+    ],
 }
 
 
@@ -155,4 +172,8 @@ def _responsibilities_for(role: str) -> list[str]:
         "senior-engineer": ["生产级编码", "技术方案", "代码审查", "经验传授"],
         "junior-engineer": ["编码与测试", "求助与学习"],
         "designer": ["设计方案", "视觉资产", "品牌一致性"],
+        "product-manager": ["产品规划", "需求文档", "优先级排序", "跨团队协调"],
+        "marketer": ["市场推广", "内容创作", "品牌定位", "用户调研"],
+        "data-analyst": ["数据分析", "指标监控", "实验设计", "报表输出"],
+        "qa-engineer": ["测试用例", "质量把关", "缺陷追踪", "测试自动化"],
     }.get(role, [])

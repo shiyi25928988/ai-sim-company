@@ -428,8 +428,9 @@ class CompanyHub:
         if not results:
             return {"learned": None, "query": query}
         src = results[0]
+        slug = re.sub(r"[^a-z0-9]+", "-", src.name.lower()).strip("-")[:24] or "skill"
         skill = Skill(
-            id=f"skill-{self.clock.tick}-learn-{src.id}",
+            id=f"skill-{self.clock.tick}-{agent_id}-learn-{slug}",
             name=src.name,
             category=src.category,
             level=SkillLevel.PERSONAL,

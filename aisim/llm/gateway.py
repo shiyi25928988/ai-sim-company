@@ -121,7 +121,7 @@ class LLMGateway:
         prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
         env = Environment(loader=FileSystemLoader(prompts_dir), autoescape=False)
         try:
-            tmpl = env.get_template(f"{profile.role}.j2")
+            tmpl = env.get_template(f"{profile.role.replace('-', '_')}.j2")
         except TemplateNotFound:
             return build_identity_block(profile)
         return tmpl.render(profile=profile)

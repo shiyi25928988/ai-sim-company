@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api")
 
 class CreateAgentRequest(BaseModel):
     name: str
-    role: str  # ceo/cto/hr-director/senior-engineer/junior-engineer/designer
+    role: str  # e.g. ceo/hr-director/senior-engineer/junior-engineer/designer/product-manager/marketer/data-analyst/qa-engineer
     department: str = "General"
     salary: int = 0
     personality: dict = {}

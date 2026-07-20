@@ -29,6 +29,7 @@ export default function McpPage() {
     url: "",
   });
   const [pasteText, setPasteText] = useState("");
+  const [pasteName, setPasteName] = useState("");
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,14 +51,18 @@ export default function McpPage() {
       toast("Invalid JSON", "error");
       return;
     }
-    if (!body.name) {
+    // Name may come from the Name field or a "name" key in the pasted JSON.
+    const name = (pasteName.trim() || (typeof body.name === "string" ? body.name : "")).trim();
+    if (!name) {
       toast("name is required", "error");
       return;
     }
+    body.name = name;
     addMut.mutate(body, {
       onSuccess: () => {
-        toast(`MCP server "${body.name}" added.`, "success");
+        toast(`MCP server "${name}" added.`, "success");
         setPasteText("");
+        setPasteName("");
       },
       onError: (e: Error) => toast(e.message, "error"),
     });
@@ -187,14 +192,23 @@ export default function McpPage() {
             </form>
           ) : (
             <div className="space-y-2 text-xs">
+              <label className="block">
+                Name
+                <input
+                  className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
+                  value={pasteName}
+                  onChange={(e) => setPasteName(e.target.value)}
+                  placeholder="filesystem (required if not in JSON)"
+                />
+              </label>
               <p className="text-gray-500">
-                Paste an MCP server config (JSON). Supports stdio / sse / streamableHttp.
+                Paste an MCP server config (JSON). Name can come from the field above or a "name" key in the JSON.
               </p>
               <textarea
                 className="h-40 w-full resize-y rounded border border-gray-600 bg-black/40 px-2 py-1 font-mono"
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
-                placeholder={'{\n  "name": "filesystem",\n  "transport": "stdio",\n  "command": "npx -y @modelcontextprotocol/server-filesystem /tmp"\n}\n\n// sse / streamableHttp:\n// {\n//   "name": "remote",\n//   "transport": "streamableHttp",\n//   "url": "http://localhost:8080/mcp"\n// }'}
+                placeholder={'{\n  "transport": "stdio",\n  "command": "npx -y @modelcontextprotocol/server-filesystem /tmp"\n}\n\n// sse / streamableHttp:\n// {\n//   "transport": "streamableHttp",\n//   "url": "http://localhost:8080/mcp"\n// }'}
               />
               <button
                 className="pixel-panel w-full py-1 hover:text-cyan-300"

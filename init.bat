@@ -36,8 +36,11 @@ for /f "delims=" %%v in ('npm --version') do echo   npm %%v
 
 REM --- 3. Redis (optional, only needed to run) ---
 echo [3/6] Redis (optional)...
-python -c "import redis; redis.Redis(host='localhost',port=6379,password='123456').ping(); print('  Redis OK on :6379')" 2>nul
-if !errorlevel! neq 0 echo   Redis not reachable on localhost:6379 (pw 123456) - start it before start.bat.
+REM Read REDIS_* from .env (manual parse - python-dotenv isn't installed until step 4).
+REM If .env can't be read or redis isn't installed yet, skip the check instead of
+REM reporting a misleading "not reachable on localhost".
+python -c "import importlib.util,os,sys; (print('  Redis check skipped: redis module not installed yet (installed in step 4)') or sys.exit(0)) if importlib.util.find_spec('redis') is None else None; (print('  Redis check skipped: .env not created yet (copy .env.example .env)') or sys.exit(0)) if not os.path.exists('.env') else None; import redis; cfg=dict((k.strip(),v.strip()) for k,v in (line.split('=',1) for line in open('.env',encoding='utf-8') if '=' in line and not line.lstrip().startswith('#'))); h=cfg.get('REDIS_HOST','localhost'); p=int(cfg.get('REDIS_PORT','6379')); pw=cfg.get('REDIS_PASSWORD',''); db=int(cfg.get('REDIS_DB','0')); redis.Redis(host=h,port=p,password=pw,db=db,socket_connect_timeout=3).ping(); print('  Redis OK:',h,p,'db'+str(db))" 2>nul
+if !errorlevel! neq 0 echo   Redis not reachable per .env (REDIS_HOST/PORT/PASSWORD) - start it before start.bat.
 
 REM --- 4. Backend deps ---
 echo [4/6] Installing backend deps (requirements-dev.txt)...

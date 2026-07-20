@@ -500,3 +500,71 @@ async def read_file(path: str, scope: str = "shared") -> dict:
     if content is None:
         raise HTTPException(status_code=404, detail=f"file not found: {path}")
     return {"path": path, "content": content}
+
+
+# ═══ MCP (Model Context Protocol) ═══
+
+
+class McpServerRequest(BaseModel):
+    name: str
+    transport: str = "stdio"  # stdio | sse
+    command: str | None = None
+    args: list[str] = []
+    url: str | None = None
+    env: dict | None = None
+
+
+@router.get("/mcp")
+async def list_mcp() -> dict:
+    return {"servers": hub.mcp_manager.servers_status()}
+
+
+@router.post("/mcp")
+async def add_mcp_server(req: McpServerRequest) -> dict:
+    """Add an MCP server (writes company.yaml, configures, connects)."""
+    import yaml
+    from pathlib import Path
+
+    cfg_path = Path("config/company.yaml")
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    existing: dict = {}
+    if cfg_path.exists():
+        existing = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    servers = existing.setdefault("llm", {}).setdefault("mcp_servers", [])
+    servers[:] = [s for s in servers if s.get("name") != req.name]
+    servers.append({k: v for k, v in req.model_dump().items() if v is not None})
+    cfg_path.write_text(
+        yaml.safe_dump(existing, default_flow_style=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    hub.config.llm.mcp_servers = servers
+    hub.mcp_manager.configure(servers)
+    await hub.mcp_manager.connect(req.name)
+    return {"servers": hub.mcp_manager.servers_status()}
+
+
+@router.delete("/mcp/{name}")
+async def delete_mcp_server(name: str) -> dict:
+    import yaml
+    from pathlib import Path
+
+    await hub.mcp_manager.disconnect(name)
+    cfg_path = Path("config/company.yaml")
+    if cfg_path.exists():
+        existing = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        servers = existing.get("llm", {}).get("mcp_servers", [])
+        servers[:] = [s for s in servers if s.get("name") != name]
+        cfg_path.write_text(
+            yaml.safe_dump(existing, default_flow_style=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        hub.config.llm.mcp_servers = servers
+        hub.mcp_manager.configure(servers)
+    return {"servers": hub.mcp_manager.servers_status()}
+
+
+@router.post("/mcp/{name}/connect")
+async def connect_mcp_server(name: str) -> dict:
+    hub.mcp_manager.configure(hub.config.llm.mcp_servers)
+    ok = await hub.mcp_manager.connect(name)
+    return {"name": name, "connected": ok, "servers": hub.mcp_manager.servers_status()}

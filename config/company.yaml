@@ -24,6 +24,7 @@ llm:
   default_model: ${LLM_MODEL}
   enable_tools: ${LLM_TOOLS_ENABLED}
   max_iters: ${LLM_MAX_ITERS}
+  mcp_servers: []
   provider: ${LLM_PROVIDER}
   routing: {}
 simulation:

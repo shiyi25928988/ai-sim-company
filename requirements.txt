@@ -2,6 +2,7 @@
 # Backend (Company Hub + Agent runtime) is Python 3.12.
 fastapi>=0.115
 python-multipart>=0.0.7   # FastAPI UploadFile (skill package upload)
+mcp>=1.0                  # Model Context Protocol client (agent MCP tools)
 uvicorn[standard]>=0.30
 # redis[hiredis] provides the async client used everywhere (redis.asyncio).
 # NOTE: the design doc names the deprecated `aioredis`; we use its successor

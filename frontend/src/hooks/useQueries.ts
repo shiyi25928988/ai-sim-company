@@ -219,3 +219,64 @@ export const useFileContentQuery = (path: string, scope: string) =>
       ),
     enabled: !!path,
   });
+
+export interface McpServer {
+  name: string;
+  transport: string;
+  url: string | null;
+  command: string | null;
+  connected: boolean;
+  tools: string[];
+}
+
+export interface McpServerBody {
+  name: string;
+  transport?: string;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+}
+
+export const useMcpQuery = () =>
+  useQuery({
+    queryKey: ["mcp"],
+    queryFn: () => fetchJson<{ servers: McpServer[] }>("/api/mcp"),
+  });
+
+export const useAddMcpMutation = () =>
+  useMutation({
+    mutationFn: async (body: McpServerBody) => {
+      const r = await fetch(`${API_URL}/api/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "add mcp failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mcp"] }),
+  });
+
+export const useDeleteMcpMutation = () =>
+  useMutation({
+    mutationFn: async (name: string) => {
+      const r = await fetch(`${API_URL}/api/mcp/${name}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "delete mcp failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mcp"] }),
+  });
+
+export const useConnectMcpMutation = () =>
+  useMutation({
+    mutationFn: async (name: string) => {
+      const r = await fetch(`${API_URL}/api/mcp/${name}/connect`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "connect mcp failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mcp"] }),
+  });

@@ -24,6 +24,7 @@ from aisim.company.profile_registry import ProfileRegistry
 from aisim.company.task_manager import TaskManager
 from aisim.db import Database
 from aisim.llm.gateway import LLMGateway
+from aisim.llm.mcp import MCPClientManager
 from aisim.shared import channels
 from aisim.shared.config import Config
 from aisim.shared.models import (
@@ -70,6 +71,9 @@ class CompanyHub:
         # LLM
         self.llm_gateway = LLMGateway(config.llm)
 
+        # MCP (agent connection to external MCP servers)
+        self.mcp_manager = MCPClientManager()
+
         # Knowledge
         self.skill_pool = SkillPool(self.message_bus)
         self.llm_gateway.skill_pool = self.skill_pool
@@ -103,6 +107,10 @@ class CompanyHub:
         if self.agent_manager.mode == "simulated":
             await self.agent_runner.start()
 
+        # MCP servers
+        self.mcp_manager.configure(self.config.llm.mcp_servers)
+        await self.mcp_manager.connect_all()
+
         if self.config.simulation.auto_start:
             await self.clock.start()
         else:
@@ -120,6 +128,7 @@ class CompanyHub:
         if self._stale_task is not None:
             self._stale_task.cancel()
             self._stale_task = None
+        await self.mcp_manager.disconnect_all()
         await self.llm_gateway.aclose()
         await self.message_bus.close()
         self.db.close()

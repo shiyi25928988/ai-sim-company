@@ -73,6 +73,7 @@ class FakeHub:
             simulation=SimpleNamespace(agent_think_every=1),
             company=SimpleNamespace(business_description="", monthly_budget=0),
         )
+        self.mcp_manager = SimpleNamespace(list_all_tools=lambda: [])
         self.events: list[dict] = []
         self.created: list[dict] = []
         self.tasks: list[dict] = []

@@ -123,7 +123,7 @@ class SimulatedAgentRunner:
         try:
             profile = rt.profile
             tasks = await self.hub.task_manager.pending_for(agent_id, profile.role)
-            user_msg = self._build_prompt(profile, snapshot, rt.memory, tasks, self.hub.config.company)
+            user_msg = self._build_prompt(profile, snapshot, rt.memory, tasks)
             messages: list[dict] = [{"role": "user", "content": user_msg}]
             max_iters = self.hub.config.llm.max_iters
             tick = snapshot.get("tick", 0)
@@ -131,7 +131,8 @@ class SimulatedAgentRunner:
 
             # ── Multi-turn tool loop ──
             for _ in range(max_iters):
-                resp = await self.hub.llm_gateway.chat(profile, messages, tools=profile.tools)
+                mcp_tools = self.hub.mcp_manager.list_all_tools()
+                resp = await self.hub.llm_gateway.chat(profile, messages, tools=profile.tools + mcp_tools)
                 if resp.error:
                     logger.warning("[%s] LLM 错误: %s", agent_id, resp.error)
                     await self.hub.emit_frontend(
@@ -180,10 +181,10 @@ class SimulatedAgentRunner:
             rt.busy = False
 
     # ── Prompt assembly ──
-    @staticmethod
-    def _build_prompt(profile: AgentProfile, snapshot: dict, memory: MemoryManager, tasks: list, company) -> str:
+    def _build_prompt(self, profile: AgentProfile, snapshot: dict, memory: MemoryManager, tasks: list) -> str:
         from aisim.tools import all_tools
 
+        company = self.hub.config.company
         agents = snapshot.get("agents", [])
         team = ", ".join(
             f"{a['name']}({a['role']}, id={a.get('agent_id', a['name'])})" for a in agents
@@ -192,7 +193,9 @@ class SimulatedAgentRunner:
         query = f"{company.business_description} {' '.join(t.title for t in tasks)}".strip()
         recent = "\n".join(f"- {m.content}" for m in memory.recall(query, 5)) or "(none)"
         registered = set(all_tools().keys())
-        tools = ", ".join(t for t in profile.tools if t in registered) or "(none)"
+        tool_names = [t for t in profile.tools if t in registered]
+        tool_names.extend(t["function"]["name"] for t in self.hub.mcp_manager.list_all_tools())
+        tools = ", ".join(tool_names) or "(none)"
         directive = SimulatedAgentRunner._directive(profile, agents, tasks)
         task_lines = (
             "\n".join(f"- [{t.id}] {t.title}: {t.description}" for t in tasks)
@@ -368,6 +371,9 @@ class SimulatedAgentRunner:
                 {"type": "agent_action", "agent": profile.name,
                  "action": f"create_skill {r.get('name', '')}"})
             return f"Created skill '{r.get('name', '')}' (level={r.get('level', '')})"
+
+        if name.startswith("mcp_"):
+            return await self.hub.mcp_manager.call_tool(name, args)
 
         if name in ("write_file", "read_file", "list_files"):
             path = args.get("path", "").lstrip("/")

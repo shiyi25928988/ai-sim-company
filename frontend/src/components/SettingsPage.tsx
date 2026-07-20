@@ -37,7 +37,7 @@ export function SettingsPage() {
           <div className="mt-2 space-y-1 text-xs">
             <div>Provider: {cfg.provider}</div>
             <div>Default model: {cfg.default_model}</div>
-            <div>Daily budget: {cfg.daily_budget <= 0 ? "Unlimited" : `${cfg.daily_budget.toLocaleString()} tokens`}</div>
+            <div>Daily budget: {cfg.daily_budget.toLocaleString()} tokens</div>
             <div>Usage today: {cfg.usage_today.toLocaleString()} tokens</div>
             <div className="mt-2">
               <div className="mb-1 text-gray-400">Role -&gt; model routing</div>
@@ -92,7 +92,10 @@ export function SettingsPage() {
           <a href="/skills" className="text-cyan-300 hover:underline">
             Manage skills -&gt;
           </a>{" "}
-          (upload / install / delete)
+          (upload / install / delete) ·{" "}
+          <a href="/mcp" className="text-cyan-300 hover:underline">
+            MCP servers -&gt;
+          </a>
         </p>
       </section>
     </div>

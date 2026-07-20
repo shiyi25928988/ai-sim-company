@@ -151,6 +151,51 @@ export const useDeleteSkillMutation = () =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
   });
 
+export const useUpdateSkillMutation = () =>
+  useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: Partial<SkillRequestBody> }) => {
+      const r = await fetch(`${API_URL}/api/skills/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "update failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
+  });
+
+export const useImportSkillMutation = () =>
+  useMutation({
+    mutationFn: async (content: string) => {
+      const r = await fetch(`${API_URL}/api/skills/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "import failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
+  });
+
+export const useInstallUrlSkillMutation = () =>
+  useMutation({
+    mutationFn: async (url: string) => {
+      const r = await fetch(`${API_URL}/api/skills/install-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "install failed");
+      return j;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["skills"] }),
+  });
+
 export interface WorkspaceEntry {
   name: string;
   is_dir: boolean;

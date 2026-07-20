@@ -76,6 +76,27 @@ class SkillPool:
         await self.bus.hdel(channels.KEY_SKILLS, skill_id)
         return existed
 
+    async def update(self, skill_id: str, fields: dict) -> Skill | None:
+        """Update editable fields on a Skill (name/description/prompt_injection/category/level/scope)."""
+        s = await self.get(skill_id)
+        if s is None:
+            return None
+        if "name" in fields:
+            s.name = fields["name"]
+        if "description" in fields:
+            s.description = fields["description"]
+        if "prompt_injection" in fields:
+            s.prompt_injection = fields["prompt_injection"]
+        if "category" in fields:
+            s.category = SkillCategory(fields["category"])
+        if "level" in fields:
+            s.level = SkillLevel(fields["level"])
+        if "scope" in fields:
+            s.scope = fields["scope"]
+        s.version += 1
+        await self._save(s)
+        return s
+
     async def get(self, skill_id: str) -> Skill | None:
         data = await self.bus.hget_json(channels.KEY_SKILLS, skill_id)
         return _from_dict(data) if data else None

@@ -472,6 +472,14 @@ class CompanyHub:
         logger.info("[user] deleted Skill: %s (existed=%s)", skill_id, existed)
         return {"removed": skill_id, "existed": existed}
 
+    async def update_skill(self, skill_id: str, **fields) -> dict | None:
+        """Update editable fields on a Skill. Returns the updated dict, or None if not found."""
+        s = await self.skill_pool.update(skill_id, fields)
+        if s is None:
+            return None
+        logger.info("[user] updated Skill: %s", skill_id)
+        return SkillPool.to_dict(s)
+
     async def find_skill(self, query: str) -> list[dict]:
         """Search published skills by keyword; return summaries (no copy created)."""
         results = await self.skill_pool.search(query)

@@ -10,6 +10,42 @@ from aisim.api.state import hub
 router = APIRouter(prefix="/api")
 
 
+def _parse_skill_content(text: str) -> dict:
+    """Parse a skill definition from JSON / YAML / Markdown-with-frontmatter.
+
+    Markdown frontmatter (--- ... ---) holds the metadata; the body becomes prompt_injection.
+    """
+    import json
+    import re
+
+    import yaml
+
+    text = (text or "").strip()
+    if not text:
+        return {}
+    if text.startswith("---"):
+        m = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", text, re.DOTALL)
+        if m:
+            meta = yaml.safe_load(m.group(1)) or {}
+            if not isinstance(meta, dict):
+                meta = {}
+            body = m.group(2).strip()
+            if body:
+                meta["prompt_injection"] = body
+            return meta
+    try:
+        d = json.loads(text)
+        return d if isinstance(d, dict) else {}
+    except json.JSONDecodeError:
+        pass
+    try:
+        d = yaml.safe_load(text)
+        return d if isinstance(d, dict) else {}
+    except yaml.YAMLError:
+        pass
+    return {}
+
+
 # ═══ Request models ═══
 
 
@@ -192,16 +228,37 @@ async def delete_skill(skill_id: str) -> dict:
     return await hub.delete_skill(skill_id)
 
 
+class SkillUpdateRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    prompt_injection: str | None = None
+    category: str | None = None
+    level: str | None = None
+    scope: list[str] | None = None
+
+
+@router.put("/skills/{skill_id}")
+async def update_skill(skill_id: str, req: SkillUpdateRequest) -> dict:
+    """Update editable fields on a skill."""
+    s = await hub.update_skill(skill_id, **req.model_dump(exclude_none=True))
+    if s is None:
+        raise HTTPException(status_code=404, detail=f"skill not found: {skill_id}")
+    return s
+
+
 @router.post("/skills/upload")
 async def upload_skill(file: UploadFile = File(...)) -> dict:
-    """Upload a skill package: a .zip containing skill.json (or skill.yaml) + optional prompt.md.
+    """Upload a skill package (.zip).
 
-    The json/yaml holds {name, description, category, level, scope, prompt_injection};
-    if prompt.md is present it overrides prompt_injection (for long rule text).
+    SKILL.md (or skill.md / skill.json / skill.yaml) is the skill definition: frontmatter is
+    metadata, body is prompt_injection. prompt.md (if present) overrides prompt_injection.
+    .py files are saved to workspace_dir/skills/{name}/ so agents can read/run them.
     """
     import io
     import json
+    import re
     import zipfile
+    from pathlib import Path
 
     import yaml
 
@@ -212,19 +269,130 @@ async def upload_skill(file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail="not a valid zip file")
     meta: dict = {}
     prompt: str | None = None
+    py_files: list[tuple[str, bytes]] = []
+    md_files: list[tuple[str, bytes]] = []
     with zf:
         for n in zf.namelist():
             base = n.split("/")[-1]
-            if base == "skill.json":
+            if not base:
+                continue
+            low = base.lower()
+            if low == "skill.md":
+                meta = _parse_skill_content(zf.read(n).decode("utf-8")) or meta
+            elif low == "skill.json":
                 meta = json.loads(zf.read(n).decode("utf-8"))
-            elif base in ("skill.yaml", "skill.yml"):
+            elif low in ("skill.yaml", "skill.yml"):
                 meta = yaml.safe_load(zf.read(n).decode("utf-8")) or {}
-            elif base == "prompt.md":
+            elif low == "prompt.md":
                 prompt = zf.read(n).decode("utf-8")
+            elif low.endswith(".py"):
+                py_files.append((n, zf.read(n)))
+            elif low.endswith(".md"):
+                md_files.append((n, zf.read(n)))
     if not meta:
-        raise HTTPException(status_code=400, detail="skill.json or skill.yaml not found in zip")
+        raise HTTPException(status_code=400, detail="SKILL.md / skill.json / skill.yaml not found in zip")
     if prompt:
         meta["prompt_injection"] = prompt
+
+    created = await hub.create_skill(
+        name=meta.get("name", "Unnamed"),
+        description=meta.get("description", ""),
+        prompt_injection=meta.get("prompt_injection", ""),
+        category=meta.get("category", "technical"),
+        level=meta.get("level", "company"),
+        scope=meta.get("scope", []) or [],
+    )
+
+    if py_files or md_files:
+        slug = re.sub(r"[^a-z0-9]+", "-", (meta.get("name") or "skill").lower()).strip("-")[:24] or "skill"
+        base_dir = (Path(hub.config.company.workspace_dir) / "skills" / slug).resolve()
+
+        def _save(files: list[tuple[str, bytes]]) -> list[str]:
+            saved: list[str] = []
+            for path, content in files:
+                fname = Path(path).name
+                target = (base_dir / fname).resolve()
+                if str(target).startswith(str(base_dir)):
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(content)
+                    saved.append(fname)
+            return saved
+
+        created["python_files"] = _save(py_files)
+        created["markdown_files"] = _save(md_files)
+
+    return created
+
+
+class SkillImportRequest(BaseModel):
+    content: str  # JSON or YAML text
+
+
+@router.post("/skills/import")
+async def import_skill(req: SkillImportRequest) -> dict:
+    """Import a skill from pasted JSON / YAML / Markdown (frontmatter)."""
+    meta = _parse_skill_content(req.content)
+    if not meta:
+        raise HTTPException(status_code=400, detail="no skill definition found (JSON/YAML/Markdown)")
+    return await hub.create_skill(
+        name=meta.get("name", "Unnamed"),
+        description=meta.get("description", ""),
+        prompt_injection=meta.get("prompt_injection", ""),
+        category=meta.get("category", "technical"),
+        level=meta.get("level", "company"),
+        scope=meta.get("scope", []) or [],
+    )
+
+
+class SkillInstallUrlRequest(BaseModel):
+    url: str
+
+
+@router.post("/skills/install-url")
+async def install_skill_from_url(req: SkillInstallUrlRequest) -> dict:
+    """Download a skill from a URL (.json/.yaml/.zip) and install it."""
+    import io
+    import json
+    import zipfile
+
+    import httpx
+    import yaml
+
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            r = await client.get(req.url)
+            r.raise_for_status()
+            data = r.content
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=400, detail=f"download failed: {e}")
+    meta: dict = {}
+    url_lower = req.url.lower()
+    if zipfile.is_zipfile(io.BytesIO(data)) or url_lower.endswith(".zip"):
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(data))
+        except zipfile.BadZipFile:
+            raise HTTPException(status_code=400, detail="not a valid zip")
+        prompt: str | None = None
+        with zf:
+            for n in zf.namelist():
+                base = n.split("/")[-1]
+                if base == "skill.json":
+                    meta = json.loads(zf.read(n).decode("utf-8"))
+                elif base in ("skill.yaml", "skill.yml"):
+                    meta = yaml.safe_load(zf.read(n).decode("utf-8")) or {}
+                elif base == "skill.md":
+                    meta = _parse_skill_content(zf.read(n).decode("utf-8"))
+                elif base == "prompt.md":
+                    prompt = zf.read(n).decode("utf-8")
+        if prompt:
+            meta["prompt_injection"] = prompt
+    else:
+        text = data.decode("utf-8", errors="replace")
+        meta = _parse_skill_content(text)
+        if not meta:
+            raise HTTPException(status_code=400, detail="content is not valid JSON/YAML/Markdown/zip")
+    if not isinstance(meta, dict) or not meta:
+        raise HTTPException(status_code=400, detail="no skill definition found")
     return await hub.create_skill(
         name=meta.get("name", "Unnamed"),
         description=meta.get("description", ""),

@@ -37,24 +37,35 @@ class MCPClientManager:
         transport_ctx = None
         session = None
         try:
+            logger.info("MCP connect '%s': transport=%s", name, transport)
             if transport == "sse":
                 from mcp.client.sse import sse_client
 
+                logger.info("MCP '%s': sse url=%s", name, cfg.get("url"))
                 transport_ctx = sse_client(cfg["url"])
                 read, write = await transport_ctx.__aenter__()
             elif transport in ("streamableHttp", "streamable_http"):
                 from mcp.client.streamable_http import streamablehttp_client
 
+                logger.info("MCP '%s': streamableHttp url=%s", name, cfg.get("url"))
                 transport_ctx = streamablehttp_client(cfg["url"])
                 read, write, _ = await transport_ctx.__aenter__()
             else:
                 import shlex
+                import sys
 
                 from mcp.client.stdio import StdioServerParameters, stdio_client
 
+                logger.info("MCP '%s': stdio command=%s", name, cfg.get("command"))
                 parts = shlex.split(cfg.get("command", ""))
                 command = parts[0] if parts else ""
                 args = list(cfg.get("args", []) or []) + parts[1:]
+                # Windows: .cmd/.bat scripts (npx, npm) can't be launched by CreateProcess
+                # directly; wrap with `cmd /c` so the shell resolves them.
+                if sys.platform == "win32":
+                    args = ["/c", command, *args]
+                    command = "cmd"
+                logger.info("MCP '%s': resolved command=%s args=%s", name, command, args)
                 params = StdioServerParameters(command=command, args=args, env=cfg.get("env"))
                 transport_ctx = stdio_client(params)
                 read, write = await transport_ctx.__aenter__()
@@ -62,7 +73,9 @@ class MCPClientManager:
 
             session_cm = ClientSession(read, write)
             session = await session_cm.__aenter__()
+            logger.info("MCP '%s': session created, initializing...", name)
             await session.initialize()
+            logger.info("MCP '%s': initialized, listing tools...", name)
             tools_resp = await session.list_tools()
             self._sessions[name] = session
             self._contexts[name] = (transport_ctx, session_cm)

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from aisim.api.state import hub
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -525,6 +529,7 @@ async def add_mcp_server(req: McpServerRequest) -> dict:
     import yaml
     from pathlib import Path
 
+    logger.info("Adding MCP server '%s' (transport=%s)", req.name, req.transport)
     cfg_path = Path("config/company.yaml")
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
     existing: dict = {}
@@ -537,9 +542,12 @@ async def add_mcp_server(req: McpServerRequest) -> dict:
         yaml.safe_dump(existing, default_flow_style=False, allow_unicode=True),
         encoding="utf-8",
     )
+    logger.info("MCP config written to %s (%d servers total)", cfg_path, len(servers))
     hub.config.llm.mcp_servers = servers
     hub.mcp_manager.configure(servers)
+    logger.info("MCP manager configured, connecting '%s'...", req.name)
     await hub.mcp_manager.connect(req.name)
+    logger.info("MCP add '%s' done", req.name)
     return {"servers": hub.mcp_manager.servers_status()}
 
 

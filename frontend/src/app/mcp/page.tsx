@@ -44,28 +44,43 @@ export default function McpPage() {
   };
 
   const submitPaste = () => {
-    let body: McpServerBody;
+    let parsed: unknown;
     try {
-      body = JSON.parse(pasteText);
+      parsed = JSON.parse(pasteText);
     } catch {
       toast("Invalid JSON", "error");
       return;
     }
-    // Name may come from the Name field or a "name" key in the pasted JSON.
-    const name = (pasteName.trim() || (typeof body.name === "string" ? body.name : "")).trim();
-    if (!name) {
+    // Accept: {name,...} | [{name,...}] | Claude Desktop {mcpServers:{name:{command,args,env}}}
+    let servers: McpServerBody[];
+    const p = parsed as Record<string, unknown>;
+    if (p && typeof p === "object" && p.mcpServers && typeof p.mcpServers === "object") {
+      servers = Object.entries(p.mcpServers as Record<string, Record<string, unknown>>).map(
+        ([name, cfg]) => ({ name, transport: "stdio", ...(cfg as Record<string, unknown>) }),
+      ) as McpServerBody[];
+    } else if (Array.isArray(parsed)) {
+      servers = parsed as McpServerBody[];
+    } else if (p && p.name) {
+      servers = [p as unknown as McpServerBody];
+    } else {
+      toast("Invalid MCP config (expected {name,...} or {mcpServers:{...}})", "error");
+      return;
+    }
+    if (servers.length === 1 && pasteName.trim()) {
+      servers[0].name = pasteName.trim();
+    }
+    if (!servers.every((s) => s.name)) {
       toast("name is required", "error");
       return;
     }
-    body.name = name;
-    addMut.mutate(body, {
-      onSuccess: () => {
-        toast(`MCP server "${name}" added.`, "success");
-        setPasteText("");
-        setPasteName("");
-      },
-      onError: (e: Error) => toast(e.message, "error"),
-    });
+    servers.forEach((body) =>
+      addMut.mutate(body, {
+        onSuccess: () => toast(`MCP server "${body.name}" added.`, "success"),
+        onError: (e: Error) => toast(e.message, "error"),
+      }),
+    );
+    setPasteText("");
+    setPasteName("");
   };
 
   return (

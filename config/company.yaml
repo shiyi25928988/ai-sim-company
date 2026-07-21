@@ -24,7 +24,12 @@ llm:
   default_model: ${LLM_MODEL}
   enable_tools: ${LLM_TOOLS_ENABLED}
   max_iters: ${LLM_MAX_ITERS}
-  mcp_servers: []
+  mcp_servers:
+  - args:
+    - '@playwright/mcp@latest'
+    command: npx
+    name: playwright
+    transport: stdio
   provider: ${LLM_PROVIDER}
   routing: {}
 simulation:

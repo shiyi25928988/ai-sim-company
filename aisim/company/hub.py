@@ -326,6 +326,7 @@ class CompanyHub:
         salary: int = 0,
         personality: dict | Personality | None = None,
         report_to: str | None = None,
+        description: str = "",
     ) -> dict:
         """Create a new Agent (the landing of the create_agent tool called by CEO/HR)."""
         agent_id = _make_agent_id(role, name)
@@ -333,7 +334,7 @@ class CompanyHub:
         report_to = report_to or self.config.ceo.agent_id
 
         profile = self.profile_registry.generate_profile(
-            agent_id, name, role, department, persona, salary, report_to
+            agent_id, name, role, department, persona, salary, report_to, description=description
         )
         await self.profile_registry.save(profile)
         self.org_chart.add(agent_id, role, department, report_to)

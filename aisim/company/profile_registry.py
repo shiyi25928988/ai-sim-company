@@ -56,6 +56,12 @@ TOOLS_BY_ROLE: dict[str, list[str]] = {
     ],
 }
 
+# Tools for custom/unknown roles (no entry in TOOLS_BY_ROLE) so custom agents can act.
+DEFAULT_TOOLS: list[str] = [
+    "complete_task", "send_message", "web_search",
+    "write_file", "read_file", "list_files", "find_skill", "create_skill",
+]
+
 
 def _profile_to_dict(profile: AgentProfile) -> dict:
     """AgentProfile -> a JSON-serializable dict (including nested enums/dataclasses)."""
@@ -100,8 +106,16 @@ class ProfileRegistry:
         personality: Personality,
         salary: int,
         report_to: str,
+        description: str = "",
     ) -> AgentProfile:
-        """When HR/CEO call create_agent, generate the target Agent's Profile."""
+        """When HR/CEO call create_agent, generate the target Agent's Profile.
+
+        `description` (markdown) overrides the role template as the Agent's system
+        prompt base - used for custom roles (no prompt template / tool mapping).
+        """
+        system_prompt = ""
+        if description and description.strip():
+            system_prompt = f"You are {name}, a {role} at the company.\n\n{description.strip()}"
         profile = AgentProfile(
             agent_id=agent_id,
             name=name,
@@ -111,8 +125,8 @@ class ProfileRegistry:
             responsibilities=_responsibilities_for(role),
             report_to=report_to,
             salary=salary,
-            system_prompt="",
-            tools=TOOLS_BY_ROLE.get(role, []),
+            system_prompt=system_prompt,
+            tools=TOOLS_BY_ROLE.get(role) or DEFAULT_TOOLS,
             skills=[],
             workspace=f"/workspace/{agent_id}",
         )

@@ -60,6 +60,7 @@ class CreateAgentRequest(BaseModel):
     salary: int = 0
     personality: dict = {}
     report_to: str | None = None
+    description: str = ""  # markdown; becomes the agent's system prompt (used for custom roles)
 
 
 class SimulationControlRequest(BaseModel):
@@ -106,6 +107,7 @@ async def create_agent(req: CreateAgentRequest) -> dict:
         salary=req.salary,
         personality=req.personality,
         report_to=req.report_to,
+        description=req.description,
     )
 
 

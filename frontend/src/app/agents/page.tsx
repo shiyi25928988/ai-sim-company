@@ -9,19 +9,32 @@ import { Skeleton } from "@/components/Skeleton";
 import { API_URL } from "@/lib/config";
 
 const ROLES = ["ceo", "hr-director", "senior-engineer", "junior-engineer", "designer", "product-manager", "marketer", "data-analyst", "qa-engineer"];
+const CUSTOM_ROLE = "__custom__";
 
 interface CreateBody {
   name: string;
   role: string;
   department: string;
   salary: number;
+  description: string;
 }
 
-const EMPTY: CreateBody = {
+interface FormState {
+  name: string;
+  roleSelect: string;
+  customRole: string;
+  department: string;
+  salary: number;
+  description: string;
+}
+
+const EMPTY: FormState = {
   name: "",
-  role: "senior-engineer",
+  roleSelect: "senior-engineer",
+  customRole: "",
   department: "Engineering",
   salary: 80000,
+  description: "",
 };
 
 /** /agents: agent list + hire form (POST /api/agents). */
@@ -29,7 +42,7 @@ export default function AgentsPage() {
   const { data: agents = [], isLoading } = useAgentsQuery();
   const qc = useQueryClient();
   const toast = useToastStore((s) => s.push);
-  const [form, setForm] = useState<CreateBody>(EMPTY);
+  const [form, setForm] = useState<FormState>(EMPTY);
   const [error, setError] = useState<string | null>(null);
 
   const createMutation = useMutation<unknown, Error, CreateBody>({
@@ -91,8 +104,18 @@ export default function AgentsPage() {
             className="space-y-2 text-xs"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!form.name.trim()) return;
-              createMutation.mutate(form);
+              const role = form.roleSelect === CUSTOM_ROLE ? form.customRole.trim() : form.roleSelect;
+              if (!form.name.trim() || !role) {
+                setError("Name and role are required.");
+                return;
+              }
+              createMutation.mutate({
+                name: form.name,
+                role,
+                department: form.department,
+                salary: form.salary,
+                description: form.description,
+              });
             }}
           >
             <label className="block">
@@ -108,16 +131,28 @@ export default function AgentsPage() {
               Role
               <select
                 className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                value={form.roleSelect}
+                onChange={(e) => setForm({ ...form, roleSelect: e.target.value })}
               >
                 {ROLES.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
                 ))}
+                <option value={CUSTOM_ROLE}>Custom…</option>
               </select>
             </label>
+            {form.roleSelect === CUSTOM_ROLE && (
+              <label className="block">
+                Custom role name
+                <input
+                  className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
+                  value={form.customRole}
+                  onChange={(e) => setForm({ ...form, customRole: e.target.value })}
+                  placeholder="e.g. data-scientist"
+                />
+              </label>
+            )}
             <label className="block">
               Department
               <input
@@ -133,6 +168,15 @@ export default function AgentsPage() {
                 className="mt-1 w-full rounded border border-gray-600 bg-black/40 px-2 py-1"
                 value={form.salary}
                 onChange={(e) => setForm({ ...form, salary: Number(e.target.value) })}
+              />
+            </label>
+            <label className="block">
+              Description (markdown)
+              <textarea
+                className="mt-1 h-24 w-full resize-y rounded border border-gray-600 bg-black/40 px-2 py-1 font-mono"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder={"Optional. Becomes the agent's system prompt. For custom roles, describe responsibilities & behavior.\ne.g.\n- Analyze large datasets and build models\n- Report findings via send_message"}
               />
             </label>
             {error && <p className="text-bad">{error}</p>}

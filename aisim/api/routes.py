@@ -506,6 +506,20 @@ async def read_file(path: str, scope: str = "shared") -> dict:
     return {"path": path, "content": content}
 
 
+# ═══ CEO directive (console intervention) ═══
+
+
+class DirectiveRequest(BaseModel):
+    text: str
+
+
+@router.post("/ceo/directive")
+async def add_directive(req: DirectiveRequest) -> dict:
+    """Queue a directive for the CEO's next tick (add task / adjust / temporary instruction)."""
+    hub.directives.append(req.text.strip())
+    return {"queued": req.text[:100]}
+
+
 # ═══ MCP (Model Context Protocol) ═══
 
 

@@ -74,6 +74,9 @@ class CompanyHub:
         # MCP (agent connection to external MCP servers)
         self.mcp_manager = MCPClientManager()
 
+        # User/board directives injected into the CEO's next tick (console intervention)
+        self.directives: list[str] = []
+
         # Knowledge
         self.skill_pool = SkillPool(self.message_bus)
         self.llm_gateway.skill_pool = self.skill_pool

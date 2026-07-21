@@ -280,3 +280,17 @@ export const useConnectMcpMutation = () =>
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mcp"] }),
   });
+
+export const useAddDirectiveMutation = () =>
+  useMutation({
+    mutationFn: async (text: string) => {
+      const r = await fetch(`${API_URL}/api/ceo/directive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "directive failed");
+      return j;
+    },
+  });

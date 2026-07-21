@@ -177,6 +177,9 @@ class SimulatedAgentRunner:
                     {"type": "agent_message", "sender": profile.name, "content": thought[:200]}
                 )
                 logger.info("[%s] 思考: %s", profile.name, thought[:120].replace("\n", " "))
+            # CEO consumes board directives after its tick
+            if profile.role == "ceo" and getattr(self.hub, "directives", None):
+                self.hub.directives.clear()
         finally:
             rt.busy = False
 
@@ -205,6 +208,11 @@ class SimulatedAgentRunner:
         biz = company.business_description
         budget = company.monthly_budget
         budget_line = f" Budget cap: ${budget}/mo." if budget else ""
+        directive_lines = ""
+        if profile.role == "ceo" and getattr(self.hub, "directives", None):
+            directive_lines = "\nBoard/user directives (act on these this turn):\n" + "\n".join(
+                f"- {d}" for d in self.hub.directives
+            ) + "\n"
         return (
             f"Tick {snapshot.get('tick', 0)}. Company: {snapshot.get('company', '')}."
             f"{' Business: ' + biz if biz else ''}\n"
@@ -216,6 +224,7 @@ class SimulatedAgentRunner:
             f"Available tools: {tools}.\n"
             f"Decide your action this step and call tools. You may call multiple tools in sequence; "
             f"each returns a result you can act on. When you have no further actions, reply with text to end the turn."
+            f"{directive_lines}"
         )
 
     @staticmethod

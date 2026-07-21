@@ -30,6 +30,11 @@ llm:
     command: npx
     name: playwright
     transport: stdio
+  - args:
+    - powerpoint-mcp
+    command: uvx
+    name: powerpoint
+    transport: stdio
   provider: ${LLM_PROVIDER}
   routing: {}
 simulation:

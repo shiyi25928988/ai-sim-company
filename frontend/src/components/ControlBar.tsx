@@ -110,8 +110,12 @@ function DirectiveModal({ open, onClose }: { open: boolean; onClose: () => void 
   const submit = () => {
     if (!text.trim()) return;
     mut.mutate(text, {
-      onSuccess: () => {
-        toast("Directive queued for CEO.", "success");
+      onSuccess: (data) => {
+        if (data.stepped) {
+          toast("Directive sent; CEO ticked (sim was paused). Check agent messages.", "success");
+        } else {
+          toast("Directive queued for CEO (sim running).", "success");
+        }
         onClose();
       },
       onError: (e: Error) => toast(e.message, "error"),
@@ -136,7 +140,7 @@ function DirectiveModal({ open, onClose }: { open: boolean; onClose: () => void 
         <p className="text-xs text-gray-400">
           Send an instruction to the CEO. Examples: &quot;add a task: implement login&quot;,
           &quot;reprioritize task-1 to high&quot;, &quot;this week focus on performance&quot;.
-          The CEO will act on it next tick.
+          The CEO will act on it immediately (sim auto-steps if paused).
         </p>
         <textarea
           className="h-32 w-full resize-y rounded border border-gray-600 bg-black/40 px-2 py-1 text-xs"

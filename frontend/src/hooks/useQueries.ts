@@ -287,7 +287,7 @@ export const useAddDirectiveMutation = () =>
       const r = await fetch(`${API_URL}/api/ceo/directive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, step: true }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || "directive failed");

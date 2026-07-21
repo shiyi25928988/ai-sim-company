@@ -177,9 +177,9 @@ class SimulatedAgentRunner:
                     {"type": "agent_message", "sender": profile.name, "content": thought[:200]}
                 )
                 logger.info("[%s] 思考: %s", profile.name, thought[:120].replace("\n", " "))
-            # CEO consumes board directives after its tick
-            if profile.role == "ceo" and getattr(self.hub, "directives", None):
-                self.hub.directives.clear()
+            # Note: directives are consumed in _build_prompt and cleared there (before LLM call)
+            #   not here. This avoids a race: if a directive comes in during tool execution, it
+            #   would be dropped before being seen if we cleared here after build_prompt ran.
         finally:
             rt.busy = False
 
@@ -210,9 +210,11 @@ class SimulatedAgentRunner:
         budget_line = f" Budget cap: ${budget}/mo." if budget else ""
         directive_lines = ""
         if profile.role == "ceo" and getattr(self.hub, "directives", None):
-            directive_lines = "\nBoard/user directives (act on these this turn):\n" + "\n".join(
+            directive_lines = "\n\n⚠️ BOARD/USER DIRECTIVE (ACT ON THESE THIS TURN):\n" + "\n".join(
                 f"- {d}" for d in self.hub.directives
             ) + "\n"
+            # Consume immediately after reading to avoid race condition (injection happens before tool loop)
+            self.hub.directives.clear()
         return (
             f"Tick {snapshot.get('tick', 0)}. Company: {snapshot.get('company', '')}."
             f"{' Business: ' + biz if biz else ''}\n"

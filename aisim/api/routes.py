@@ -513,13 +513,18 @@ async def read_file(path: str, scope: str = "shared") -> dict:
 
 class DirectiveRequest(BaseModel):
     text: str
+    step: bool = True  # if simulation is paused, auto-step once so the CEO acts immediately
 
 
 @router.post("/ceo/directive")
 async def add_directive(req: DirectiveRequest) -> dict:
     """Queue a directive for the CEO's next tick (add task / adjust / temporary instruction)."""
     hub.directives.append(req.text.strip())
-    return {"queued": req.text[:100]}
+    stepped = False
+    if req.step and hub._started and not getattr(hub.clock, "running", False):
+        await hub.step()
+        stepped = True
+    return {"queued": req.text[:100], "stepped": stepped}
 
 
 # ═══ MCP (Model Context Protocol) ═══

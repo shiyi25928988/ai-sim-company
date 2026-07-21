@@ -13,7 +13,7 @@ ceo:
 company:
   business_description: 商业资讯公司，为个人创业者输出完整且严谨的市场调研报告
   initial_capital: 50000000000
-  monthly_budget: 800000
+  monthly_budget: 8000000
   name: Demo AI Co.
   workspace_dir: D:\data\workspace
 llm:

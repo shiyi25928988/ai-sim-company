@@ -1,13 +1,13 @@
-{# Meeting facilitation Prompt (see §6 Meeting N:N) - LLM plays host + participants + produces minutes #}
-You are hosting a meeting. Act as the host, let each participant speak, and finally produce meeting minutes.
+{# Meeting facilitation Prompt - LLM plays host + participants, outputs minutes #}
+You are hosting a meeting. Act as the host, let each participant speak, then produce minutes.
 
 Topic: {{ topic }}
 Participants: {% for p in participants %}{{ p.name }}({{ p.role }}){% if not loop.last %}, {% endif %}{% endfor %}
 
 Process:
-1. Briefly state the topic and goal
-2. Let each participant speak in turn (give their perspective based on their role, referencing them by name)
-3. Summarize disagreements and consensus
-4. Output meeting minutes: **decisions / action items / owners**
+1. State the topic and goal briefly.
+2. Let each participant speak in turn - give their perspective based on their role, reference them by name.
+3. Surface disagreements and consensus.
+4. Output minutes: **decisions / action items / owners**.
 
 Keep it concise and focused, in English, under 300 words.

@@ -11,6 +11,7 @@ The API Key is configured once in Company Hub; Agents are unaware which model se
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -51,6 +52,8 @@ class LLMGateway:
         )
         # Company Skill Pool (injected by the Hub; injects Skills into the System Prompt)
         self.skill_pool = None
+        # Concurrency limit to avoid LLM rate limits (429)
+        self._sem = asyncio.Semaphore(2)
 
     async def chat(
         self, agent_profile: AgentProfile, messages: list, tools: list | None = None
@@ -73,14 +76,15 @@ class LLMGateway:
         # 4. Tools -> OpenAI function schema (omitted entirely when the endpoint has no function-calling support)
         tool_schemas = self._resolve_tools(tools or []) if self.config.enable_tools else []
 
-        # 5. Call the provider
-        try:
-            response = await self.provider.chat(
-                model=model, system=system_prompt, messages=messages, tools=tool_schemas
-            )
-        except LLMError as e:
-            logger.error("LLM 调用失败 [%s]: %s", model, e)
-            return LLMResponse(content="", error=str(e), model=model)
+        # 5. Call the provider (concurrency-limited to avoid 429)
+        async with self._sem:
+            try:
+                response = await self.provider.chat(
+                    model=model, system=system_prompt, messages=messages, tools=tool_schemas
+                )
+            except LLMError as e:
+                logger.error("LLM 调用失败 [%s]: %s", model, e)
+                return LLMResponse(content="", error=str(e), model=model)
 
         self.usage_today += response.total_tokens()
         response.model = response.model or model

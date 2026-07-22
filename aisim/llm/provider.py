@@ -51,7 +51,12 @@ class OpenAICompatibleProvider:
         messages: list[dict],
         tools: list[dict] | None = None,
     ):
-        """Call /chat/completions and return an LLMResponse. Raises LLMError on failure."""
+        """Call /chat/completions and return an LLMResponse. Raises LLMError on failure.
+
+        Retries on HTTP 429 (rate limit) with exponential backoff.
+        """
+        import asyncio
+
         from aisim.llm.gateway import LLMResponse  # lazy import to avoid circularity
 
         if not self.api_key:
@@ -68,33 +73,51 @@ class OpenAICompatibleProvider:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
-
         url = f"{self.base_url}/chat/completions"
-        try:
-            resp = await self._client.post(url, json=payload, headers=headers)
-        except httpx.HTTPError as e:
-            raise LLMError(f"HTTP 错误: {e}") from e
 
-        if resp.status_code >= 400:
-            raise LLMError(f"HTTP {resp.status_code}: {resp.text[:300]}")
+        max_retries = 4
+        last_error: str | None = None
+        for attempt in range(max_retries + 1):
+            try:
+                resp = await self._client.post(url, json=payload, headers=headers)
+            except httpx.HTTPError as e:
+                last_error = f"HTTP 错误: {e}"
+                if attempt < max_retries:
+                    await asyncio.sleep(min(2 ** attempt, 16))
+                    continue
+                raise LLMError(last_error) from e
 
-        try:
-            data = resp.json()
-        except ValueError as e:
-            raise LLMError(f"响应非 JSON: {resp.text[:300]}") from e
+            if resp.status_code == 429 and attempt < max_retries:
+                wait = min(2 ** attempt, 16)
+                logger.warning(
+                    "LLM 429 rate limited, retry in %ss (attempt %d/%d)",
+                    wait, attempt + 1, max_retries,
+                )
+                await asyncio.sleep(wait)
+                continue
 
-        choices = data.get("choices") or []
-        if not choices:
-            raise LLMError(f"响应无 choices: {str(data)[:300]}")
+            if resp.status_code >= 400:
+                raise LLMError(f"HTTP {resp.status_code}: {resp.text[:300]}")
 
-        message = choices[0].get("message", {})
-        usage = data.get("usage") or {}
-        return LLMResponse(
-            content=message.get("content") or "",
-            tool_calls=message.get("tool_calls"),
-            usage=usage,
-            model=data.get("model", model),
-        )
+            try:
+                data = resp.json()
+            except ValueError as e:
+                raise LLMError(f"响应非 JSON: {resp.text[:300]}") from e
+
+            choices = data.get("choices") or []
+            if not choices:
+                raise LLMError(f"响应无 choices: {str(data)[:300]}")
+
+            message = choices[0].get("message", {})
+            usage = data.get("usage") or {}
+            return LLMResponse(
+                content=message.get("content") or "",
+                tool_calls=message.get("tool_calls"),
+                usage=usage,
+                model=data.get("model", model),
+            )
+
+        raise LLMError(last_error or f"HTTP 429 after {max_retries} retries")
 
     async def aclose(self) -> None:
         await self._client.aclose()

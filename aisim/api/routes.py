@@ -492,6 +492,52 @@ async def update_config(req: ConfigRequest) -> dict:
     return await hub.apply_config(new_config)
 
 
+@router.post("/clear")
+async def clear_workspace_and_redis() -> dict:
+    """Clear all data: workspace files + Redis/SQLite state + in-memory agents.
+
+    Reinitializes the Hub to a fresh CEO-only state (preserves business config; pauses the sim
+    unless SIM_AUTO_START=true). This is the "wipe everything" button - distinct from POST /api/config
+    which also changes business settings.
+    """
+    import shutil
+    from pathlib import Path
+
+    # 1. Wipe workspace produced files (keep skill packs)
+    workspace = Path(hub.config.company.workspace_dir)
+    cleared: list[str] = []
+    if workspace.exists():
+        for sub in workspace.iterdir():
+            if sub.is_dir() and sub.name not in ("packs",):
+                try:
+                    shutil.rmtree(sub)
+                    cleared.append(f"workspace/{sub.name}")
+                except Exception:  # noqa: BLE001
+                    logger.exception("rm workspace/%s failed", sub.name)
+
+    # 2. Reinit the Hub: stop sim -> clear Redis + SQLite -> reinit components -> seed CEO.
+    #    apply_config(current_config) preserves business settings while wiping all runtime state
+    #    (agents, tasks, skills, economy, clock) and rebuilds the message_bus connection cleanly.
+    #    (The previous implementation called message_bus.connect()/close() mid-flight, which broke
+    #    the Hub's live connection and left stale data visible on the frontend.)
+    await hub.apply_config(hub.config)
+    cleared.extend(["redis", "sqlite", "agents", "tasks", "skills", "economy"])
+
+    # 3. Push a fresh state_snapshot to all frontend WS clients. The TaskBoard reads from the
+    #    Zustand store (useGameStore.snapshot.tasks), which is only updated by WS state_snapshot
+    #    events - NOT by React Query invalidation. Without this push, the board shows stale tasks.
+    try:
+        await hub.emit_frontend(await hub.snapshot_event())
+    except Exception:  # noqa: BLE001
+        logger.exception("emit snapshot after clear failed")
+
+    return {
+        "status": "ok",
+        "cleared": cleared,
+        "workspace_dir": str(workspace),
+    }
+
+
 # ═══ Workspace files ═══
 
 

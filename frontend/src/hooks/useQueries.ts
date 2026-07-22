@@ -97,6 +97,24 @@ export const useUpdateConfigMutation = () =>
     },
   });
 
+export const useClearDataMutation = () =>
+  useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${API_URL}/api/clear`, { method: "POST" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || "clear failed");
+      return j;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["config"] });
+      queryClient.invalidateQueries({ queryKey: ["state"] });
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["skills"] });
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+    },
+  });
+
 export interface SkillRequestBody {
   name: string;
   description: string;

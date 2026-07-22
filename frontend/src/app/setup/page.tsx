@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   useConfigQuery,
   useUpdateConfigMutation,
+  useClearDataMutation,
   type CompanyConfig,
 } from "@/hooks/useQueries";
 import { useToastStore } from "@/store/useToastStore";
@@ -31,6 +32,7 @@ export default function SetupPage() {
   }, [cfg]);
 
   const mutation = useUpdateConfigMutation();
+  const clearMut = useClearDataMutation();
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +132,42 @@ export default function SetupPage() {
             </button>
           </form>
         )}
+
+        {/* Danger zone: clear data */}
+        <div className="border-t border-gray-700 pt-3">
+          <h3 className="mb-1 text-sm font-bold text-bad">Danger Zone</h3>
+          <p className="mb-2 text-xs text-gray-400">
+            Clear all workspace files, Redis/SQLite state, and in-memory agents - then reinitialize
+            to a fresh CEO-only state (business config above is preserved; sim pauses). Irreversible.
+            The page reloads afterwards to reset all client state.
+          </p>
+          <button
+            type="button"
+            className="w-full py-1 border border-bad bg-bad/10 px-2 text-bad hover:bg-bad hover:text-white transition-all"
+            onClick={() => {
+              const ok = window.confirm(
+                "Are you sure you want to delete all workspace files, agents, tasks, and skills? This is irreversible."
+              );
+              if (ok) {
+                clearMut.mutate(undefined, {
+                  onSuccess: (data) => {
+                    toast(
+                      `Cleared: ${Array.isArray(data.cleared) ? data.cleared.join(", ") : ""}. Reloading…`,
+                      "success"
+                    );
+                    // Hard-reload to fully reset all client state (Zustand store + React Query
+                    // cache + component state) from the freshly-reinitialized backend.
+                    setTimeout(() => window.location.reload(), 700);
+                  },
+                  onError: (err) => toast(err.message, "error"),
+                });
+              }
+            }}
+            disabled={clearMut.isPending}
+          >
+            {clearMut.isPending ? "Clearing…" : "Clear All Data"}
+          </button>
+        </div>
       </div>
     </main>
   );

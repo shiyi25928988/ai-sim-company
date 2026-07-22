@@ -12,6 +12,7 @@ The API Key is configured once in Company Hub; Agents are unaware which model se
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -124,6 +125,22 @@ class LLMGateway:
                 logger.error("LLM 调用失败 [%s]: %s", model, e)
                 return LLMResponse(content="", error=str(e), model=model)
 
+        # 7. Validate tool calls for obvious issues before returning
+        if response.tool_calls:
+            for tc in response.tool_calls:
+                fn = tc.get("function", {}) if isinstance(tc, dict) else {}
+                name = fn.get("name", "")
+                raw_args = fn.get("arguments")
+                if isinstance(raw_args, str):
+                    try:
+                        args = json.loads(raw_args)
+                    except json.JSONDecodeError:
+                        args = None
+                else:
+                    args = raw_args if isinstance(raw_args, dict) else None
+                if args is None:
+                    logger.warning("[%s] 工具调用参数非JSON: %s", model, raw_args)
+
         self.usage_today += response.total_tokens()
         response.model = response.model or model
         return response
@@ -147,7 +164,42 @@ class LLMGateway:
                     f"## Skill: {s.name}\n{s.prompt_injection}" for s in skills
                 )
 
-        return f"{base}\n\n{skill_text}".strip() if skill_text else base
+        # Common thinking framework (Claude Code pattern) - applied to all agents
+        thinking_framework = f"""
+
+# How to Think and Act
+
+## Step 1: Reason First
+Before calling any tool, think through the situation:
+1. What is the immediate priority? (Look at pending tasks first)
+2. What information do I already have? What is missing?
+3. What action will move the needle most right now?
+4. What tool(s) do I need, and what parameters will they take?
+
+Be specific and concise.
+
+## Step 2: Tool Use Rules
+- Call tools sequentially, NOT in parallel. One tool per turn.
+- Read tool results carefully before deciding on the next action.
+- If a tool fails: read the error message, fix the parameters, and retry ONCE. Do not loop infinitely.
+- If you don't know exact parameters, look them up first (e.g. find_skill before learn_skill).
+- For write_file / code: produce actual working content, not placeholders or TODOs.
+
+## Step 3: Verify & Close
+After you have acted and tool results are back:
+1. Did the tool call succeed?
+2. Is the task done? If yes, use complete_task with a clear result description.
+3. If not, what's the next step?
+4. When you have no further actions, reply with summary text to end the turn.
+
+## Constraints
+- Max 3 tool calls per turn. Finish quickly, produce visible output.
+- Be concise. No long monologues - focus on action.
+- Use send_message for coordination with other team members.
+- You are autonomous. Do not wait for user input - decide and act.
+"""
+
+        return f"{base}{thinking_framework}\n\n{skill_text}".strip() if skill_text else f"{base}{thinking_framework}"
 
     def _render_role_template(self, profile: AgentProfile) -> str:
         """Render prompts/{role}.j2; fall back to the identity block on failure."""

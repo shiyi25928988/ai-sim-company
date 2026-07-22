@@ -129,7 +129,9 @@ class SimulatedAgentRunner:
             tick = snapshot.get("tick", 0)
             thought = ""
 
-            # ── Multi-turn tool loop ──
+            # ── Multi-turn tool loop with quality controls ──
+            tool_call_count = 0
+            last_tool_name = ""
             for _ in range(max_iters):
                 mcp_tools = self.hub.mcp_manager.list_all_tools()
                 resp = await self.hub.llm_gateway.chat(profile, messages, tools=profile.tools + mcp_tools)
@@ -143,31 +145,93 @@ class SimulatedAgentRunner:
                 if resp.content and not thought:
                     thought = resp.content
                 if not resp.tool_calls:
-                    break  # plain-text reply, end this turn
+                    # Plain text reply with no tool calls - done with this turn
+                    if thought and tool_call_count == 0:
+                        thought = thought  # Pure reflection turn - nothing to do
+                    break
 
-                # Add the assistant's tool_calls to the conversation, execute each and feed tool results back
-                messages.append({
+                tool_call_count += 1
+                # Anti-loop: max 2 tool calls of the same type in a row
+                same_tool_count = sum(1 for m in messages if any(
+                    tc.get("function", {}).get("name", "") == last_tool_name
+                    for tc in (m.get("tool_calls") or [])
+                ))
+                if same_tool_count >= 2:
+                    logger.info("[%s] 连续调用同类工具超2次，停止循环", agent_id)
+                    break
+
+                # Add the assistant's tool_calls to the conversation, execute each and feed results back
+                # Wrap with structured tags and auto-summary for long outputs
+                assistant_msg = {
                     "role": "assistant",
                     "content": resp.content or "",
                     "tool_calls": resp.tool_calls,
-                })
+                }
+                messages.append(assistant_msg)
+
                 for tc in resp.tool_calls:
                     fn = tc.get("function", {}) if isinstance(tc, dict) else {}
                     name = fn.get("name", "")
+                    last_tool_name = name
                     raw_args = fn.get("arguments", "{}")
                     try:
                         args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
                     except json.JSONDecodeError:
-                        logger.warning("[%s] 工具参数非 JSON: %s", agent_id, raw_args)
                         args = {}
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc.get("id", ""),
+                            "content": f"""<tool_error>
+Invalid JSON in tool arguments. Fix the syntax and retry - make sure arguments
+is a valid JSON object string, e.g. {{\"name\": \"value\"}}.
+Raw input: {str(raw_args)[:200]}
+</tool_error>"""
+                        })
+                        continue
+
                     result = await self._execute_tool(rt, agent_id, profile, name, args, tick)
+
+                    # Result wrapping: add structure tags and auto-summarize very long output
+                    if "failed" in result.lower() or "error" in result.lower() or "not found" in result.lower():
+                        wrapped = f"""<tool_error>
+Tool: {name}
+Error: {result}
+
+How to fix:
+1. Read the error message carefully
+2. Check if you have correct parameters (missing required fields, wrong types)
+3. If a resource is missing, use a lookup tool first (e.g. find_skill before learn_skill)
+4. Retry at most ONCE - if it fails again, try a different approach
+</tool_error>"""
+                    else:
+                        if len(result) > 1200:
+                            # Auto-summary: keep head + tail
+                            wrapped = f"""<tool_result>
+Tool: {name}
+Result (truncated, {len(result)} chars total):
+--- START HEAD ---
+{result[:600]}
+--- START TAIL ---
+{result[-600:]}
+--- END ---
+Full content was written to the workspace. Extract key takeaways and proceed with your next step.
+</tool_result>"""
+                        else:
+                            wrapped = f"""<tool_result>
+Tool: {name}
+{result}
+</tool_result>"""
+
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc.get("id", ""),
-                        "content": result,
+                        "content": wrapped,
                     })
             else:
                 logger.warning("[%s] 达到 max_iters=%d 仍持续调工具", agent_id, max_iters)
+                # Always end the turn cleanly after max iterations
+                if not thought:
+                    thought = f"(Tool loop reached max iterations after {max_iters} tool calls. Turn completed.)"
 
             if thought:
                 rt.memory.add(
@@ -215,17 +279,38 @@ class SimulatedAgentRunner:
             ) + "\n"
             # Consume immediately after reading to avoid race condition (injection happens before tool loop)
             self.hub.directives.clear()
+
+        # Determine immediate priority based on task state
+        pending_count = len(tasks)
+        assigned_to_me = [t for t in tasks if t.assignee == profile.agent_id]
+        claimable = [t for t in tasks if not t.assignee and t.assignee_role == profile.role]
+
+        priority_hint = ""
+        if assigned_to_me:
+            priority_hint = f"\nYour assigned tasks ({len(assigned_to_me)}):\n" + "\n".join(
+                f"  - [{t.id}] {t.title} (status: {t.status})" for t in assigned_to_me
+            )
+        elif claimable and pending_count < 10:
+            priority_hint = f"\nUnclaimed tasks for your role ({profile.role}): {len(claimable)} - pick one using complete_task"
+        elif not tasks:
+            priority_hint = "\nNo pending tasks. Either create_task for the team or send_message to coordinate."
+
         return (
             f"Tick {snapshot.get('tick', 0)}. Company: {snapshot.get('company', '')}."
             f"{' Business: ' + biz if biz else ''}\n"
             f"Capital ${eco.get('capital', 0)}, monthly burn ${eco.get('monthly_burn', 0)}.{budget_line}"
             f" Team ({len(agents)}): {team}.\n"
             f"{directive}\n"
-            f"Your pending tasks:\n{task_lines}\n"
+            f"{priority_hint}\n"
             f"Recent actions/memory:\n{recent}\n"
-            f"Available tools: {tools}.\n"
-            f"Decide your action this step and call tools. You may call multiple tools in sequence; "
-            f"each returns a result you can act on. When you have no further actions, reply with text to end the turn."
+            f"Available tools: {tools}.\n\n"
+            f"CRITICAL INSTRUCTIONS (FOLLOW STRICTLY):\n"
+            f"1. THINK FIRST: Before calling any tool, write out your reasoning in text.\n"
+            f"2. ONE TOOL AT A TIME: Do not call tools in parallel. Execute then evaluate.\n"
+            f"3. CHECK RESULTS: Read the full tool_result/tool_error tags before deciding your next step.\n"
+            f"4. FINISH WHEN DONE: When you have acted and have no more steps, reply with a summary in text.\n"
+            f"5. NO PLACEHOLDERS: When writing code/designs, write working content, not TODOs.\n"
+            f"6. MAX 3 TOOL CALLS PER TURN. If not done by then, summarize your progress and end the turn."
             f"{directive_lines}"
         )
 

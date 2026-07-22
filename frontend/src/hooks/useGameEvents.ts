@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { useWebSocket } from "./useWebSocket";
 import { useGameStore } from "@/store/useGameStore";
 import { queryClient } from "@/lib/query-client";
+import { API_URL } from "@/lib/config";
 import type { GameSnapshot } from "@/types/game";
 
 /** Central WS subscriber: updates Zustand realtime state and invalidates Query caches. */
@@ -10,6 +12,14 @@ export function useGameEvents() {
   const pushLog = useGameStore((s) => s.pushLog);
   const setSnapshot = useGameStore((s) => s.setSnapshot);
   const setWsStatus = useGameStore((s) => s.setWsStatus);
+
+  // Initial fetch so pages have data before the first WS state_snapshot
+  useEffect(() => {
+    fetch(`${API_URL}/api/state`)
+      .then((r) => r.json())
+      .then((s: GameSnapshot) => setSnapshot(s))
+      .catch(() => {});
+  }, [setSnapshot]);
 
   useWebSocket(
     (event) => {

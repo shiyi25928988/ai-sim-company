@@ -100,6 +100,7 @@ class CompanyHub:
         self.db.connect()
         self._restore_state()
         await self.skill_pool.seed_presets()
+        await self.seed_skill_packs()
 
         await self._seed_ceo()
         await self._rehydrate_agents()
@@ -182,6 +183,62 @@ class CompanyHub:
 
         await self.start()
         return await self.snapshot()
+
+    async def seed_skill_packs(self) -> None:
+        """Load default skill packs from aisim/skills/packs/ (each subdir with SKILL.md).
+
+        Each pack's SKILL.md frontmatter (name/description) becomes the skill metadata;
+        the body is copied to the workspace as the full guide (agent reads via read_file).
+        prompt_injection is a short description + pointer (avoids bloating system prompts).
+        """
+        import re
+
+        import yaml
+
+        packs_dir = Path(__file__).parent.parent / "skills" / "packs"
+        if not packs_dir.exists():
+            return
+        ws_base = Path(self.config.company.workspace_dir) / "skills"
+        count = 0
+        for skill_dir in sorted(packs_dir.iterdir()):
+            if not skill_dir.is_dir():
+                continue
+            skill_md = skill_dir / "SKILL.md"
+            if not skill_md.exists():
+                continue
+            text = skill_md.read_text(encoding="utf-8")
+            meta: dict = {}
+            m = re.match(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", text, re.DOTALL)
+            if m:
+                meta = yaml.safe_load(m.group(1)) or {}
+            name = str(meta.get("name", skill_dir.name))
+            description = str(meta.get("description", "") or "")
+            slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:24] or name
+            short_desc = description[:200] + ("..." if len(description) > 200 else "")
+            prompt_inj = (
+                short_desc
+                + f"\n\nFull guide: read_file skills/{slug}/SKILL.md for detailed instructions."
+            ).strip()
+            skill = Skill(
+                id=f"pack-{slug}",
+                name=name,
+                category=SkillCategory.TECHNICAL,
+                level=SkillLevel.COMPANY,
+                scope=[],
+                description=short_desc,
+                prompt_injection=prompt_inj,
+                created_by="system",
+                status=SkillStatus.PUBLISHED,
+            )
+            await self.skill_pool.create(skill)
+            target_dir = (ws_base / slug).resolve()
+            target_dir.mkdir(parents=True, exist_ok=True)
+            for f in skill_dir.iterdir():
+                if f.is_file() and f.suffix in (".md", ".py"):
+                    (target_dir / f.name).write_bytes(f.read_bytes())
+            count += 1
+        if count:
+            logger.info("Seeded %d skill packs from %s", count, packs_dir)
 
     async def _seed_ceo(self) -> None:
         """Company founding: the CEO exists immediately (registered directly in local simulated mode)."""

@@ -436,6 +436,8 @@ class SimulatedAgentRunner:
                 return f"Path traversal blocked: {path}"
             if name == "write_file":
                 content = args.get("content", "")
+                if full.exists() and full.is_dir():
+                    return f"Cannot write to '{sub}/{path}': it is a directory, not a file. Specify a filename inside it."
                 full.parent.mkdir(parents=True, exist_ok=True)
                 full.write_text(content, encoding="utf-8")
                 await self.hub.emit_frontend(
@@ -445,10 +447,14 @@ class SimulatedAgentRunner:
             if name == "read_file":
                 if not full.exists():
                     return f"File not found: {path}"
+                if full.is_dir():
+                    return f"'{sub}/{path}' is a directory - call list_files on it instead."
                 return full.read_text(encoding="utf-8", errors="replace")[:4000]
             # list_files
             if not full.exists():
                 return f"Dir not found: {path}"
+            if not full.is_dir():
+                return f"'{sub}/{path}' is a file - call read_file to read it."
             files = [f"{p.name}/" if p.is_dir() else p.name for p in sorted(full.iterdir())]
             return ", ".join(files) if files else "(empty)"
 

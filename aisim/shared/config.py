@@ -24,6 +24,7 @@ class LLMConfig:
     base_url: str = ""  # OpenAI-compatible endpoint; empty uses official https://api.openai.com/v1
     default_model: str = "gpt-4o-mini"
     daily_budget: int = 2_000_000  # Daily token budget (-1 = unlimited; any value <= 0 disables the cap)
+    rpm_limit: int = 0  # Requests per minute (rate limit). 0 = unlimited (only concurrency cap applies)
     enable_tools: bool = True  # Whether to send function-calling tools to the LLM (turn off if the endpoint does not support them)
     max_iters: int = 3  # Max LLM<->tool loop rounds for a single Agent in a single tick (cost control)
     routing: dict[str, str] = field(default_factory=dict)  # Role -> model
@@ -145,6 +146,7 @@ def load_config(path: str | Path = "config/company.yaml") -> Config:
             base_url=_val(llm_raw, "base_url", ""),
             default_model=_val(llm_raw, "default_model", "gpt-4o-mini"),
             daily_budget=int(_val(llm_raw, "daily_budget", 2_000_000)),
+            rpm_limit=int(_val(llm_raw, "rpm_limit", 0)),
             enable_tools=str(_val(llm_raw, "enable_tools", "true")).lower()
             in ("1", "true", "yes", "on"),
             max_iters=int(_val(llm_raw, "max_iters", 3)),

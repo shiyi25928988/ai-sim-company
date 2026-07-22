@@ -54,6 +54,41 @@ class LLMGateway:
         self.skill_pool = None
         # Concurrency limit to avoid LLM rate limits (429)
         self._sem = asyncio.Semaphore(2)
+        # RPM rate limiting (token bucket algorithm; refill every 60s with rpm_limit tokens)
+        # Guards: _lock must be held when updating _tokens/_last_refill (they are modified concurrently from multiple agent ticks)
+        self._rpm_lock = asyncio.Lock()
+        self._rpm_tokens = 0.0
+        self._rpm_last_refill = 0.0
+
+    async def _await_rate_limit(self) -> None:
+        """RPM token bucket (RFC 7231 pattern). Returns when a token is available.
+
+        Refills tokens lazily on each call based on elapsed time since last refill.
+        No-op if rpm_limit <= 0 (rate limiting disabled)."""
+        rpm = self.config.rpm_limit
+        if rpm <= 0:
+            return
+
+        import time
+
+        async with self._rpm_lock:
+            now = time.monotonic()
+            # 60s interval (RPM) - don't let "stale" refill (e.g. after long pause) overfill the bucket
+            elapsed = now - self._rpm_last_refill
+            if elapsed >= 60:
+                self._rpm_tokens = float(rpm)
+                self._rpm_last_refill = now
+            else:
+                self._rpm_tokens += rpm * elapsed / 60.0
+                self._rpm_tokens = min(self._rpm_tokens, rpm)  # never overfill
+
+            if self._rpm_tokens < 1:
+                wait = (1.0 - self._rpm_tokens) / rpm * 60.0
+                # release lock during sleep (so other coroutines refill concurrently)
+                await asyncio.sleep(wait)
+                self._rpm_tokens = max(0.0, self._rpm_tokens + rpm * wait / 60.0 - 1)
+            else:
+                self._rpm_tokens -= 1
 
     async def chat(
         self, agent_profile: AgentProfile, messages: list, tools: list | None = None
@@ -61,7 +96,10 @@ class LLMGateway:
         # 1. Select model by role
         model = self.router.select(agent_profile.role)
 
-        # 2. Hard budget cap: stop when exceeded (cost control, avoids runaway billing)
+        # 2. Rate limit (RPM token bucket)
+        await self._await_rate_limit()
+
+        # 3. Hard budget cap: stop when exceeded (cost control, avoids runaway billing)
         if self.daily_budget > 0 and self.usage_today > self.daily_budget:
             logger.warning("LLM 预算超限: usage=%d > budget=%d，暂停调用", self.usage_today, self.daily_budget)
             return LLMResponse(
@@ -70,13 +108,13 @@ class LLMGateway:
                 model=model,
             )
 
-        # 3. Assemble the System Prompt (identity + company context + Skills)
+        # 4. Assemble the System Prompt (identity + company context + Skills)
         system_prompt = await self._build_system_prompt(agent_profile)
 
-        # 4. Tools -> OpenAI function schema (omitted entirely when the endpoint has no function-calling support)
+        # 5. Tools -> OpenAI function schema (omitted entirely when the endpoint has no function-calling support)
         tool_schemas = self._resolve_tools(tools or []) if self.config.enable_tools else []
 
-        # 5. Call the provider (concurrency-limited to avoid 429)
+        # 6. Call the provider (concurrency-limited to avoid 429)
         async with self._sem:
             try:
                 response = await self.provider.chat(

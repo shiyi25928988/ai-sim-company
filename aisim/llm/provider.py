@@ -88,10 +88,28 @@ class OpenAICompatibleProvider:
                 raise LLMError(last_error) from e
 
             if resp.status_code == 429 and attempt < max_retries:
-                wait = min(2 ** attempt, 16)
+                # Prefer Retry-After header from the API (seconds or HTTP-date),
+                # fall back to exponential backoff if missing/invalid
+                retry_after = resp.headers.get("retry-after") or resp.headers.get("Retry-After")
+                if retry_after:
+                    try:
+                        wait = int(retry_after)
+                    except ValueError:
+                        # Retry-After is a HTTP-date (e.g. "Wed, 21 Oct 2015 07:28:00 GMT")
+                        import email.utils
+                        from datetime import datetime, timezone
+                        try:
+                            retry_dt = email.utils.parsedate_to_datetime(retry_after)
+                            wait = max(1, int((retry_dt - datetime.now(timezone.utc)).total_seconds()))
+                        except Exception:
+                            wait = min(2 ** attempt, 16)
+                else:
+                    wait = min(2 ** attempt, 16)
+                wait = min(wait, 60)  # safety cap: never wait longer than 60s
                 logger.warning(
-                    "LLM 429 rate limited, retry in %ss (attempt %d/%d)",
+                    "LLM 429 rate limited, retry in %ss (attempt %d/%d)%s",
                     wait, attempt + 1, max_retries,
+                    " (Retry-After)" if retry_after else "",
                 )
                 await asyncio.sleep(wait)
                 continue

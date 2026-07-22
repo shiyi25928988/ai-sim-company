@@ -42,6 +42,7 @@ llm:
     transport: stdio
   provider: ${LLM_PROVIDER}
   routing: {}
+  rpm_limit: ${LLM_RPM_LIMIT}
 simulation:
   agent_step_delay_ms: ${AGENT_STEP_DELAY_MS}
   agent_think_every: ${AGENT_THINK_EVERY}

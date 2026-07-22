@@ -25,6 +25,9 @@ TOOLS_BY_ROLE: dict[str, list[str]] = {
         "create_agent", "send_message", "call_meeting", "view_team",
         "schedule_interview", "onboard_agent", "share_skill", "create_task",
     ],
+    "product-manager": [
+        "send_message", "web_search", "create_task", "find_skill", "call_meeting",
+    ],
     "senior-engineer": [
         "complete_task", "send_message", "share_skill", "code_review", "web_search",
         "write_file", "read_file", "list_files", "find_skill", "create_skill", "run_claude_code",

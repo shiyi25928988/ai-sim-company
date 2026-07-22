@@ -322,18 +322,26 @@ async def test_run_tick_sequential_awaits_all_agents():
 
 
 async def test_ceo_directive_delegates_hiring_to_hr():
-    """CEO division of labor: only directly hires HR; once HR is in place, hiring engineers should be delegated to HR, not done via create_agent oneself."""
+    """PM-driven hiring: CEO hires HR -> HR hires PM -> PM raises hiring requests -> HR hires per request."""
     ceo = AgentProfile(agent_id="c", name="C", role="ceo", department="E", personality=Personality())
-    # no HR -> CEO personally hires HR Director
+    # no HR -> CEO hires HR Director
     d0 = SimulatedAgentRunner._directive(ceo, [{"role": "ceo"}], [])
     assert "HR Director" in d0 and "create_agent" in d0
-    # has HR, no engineers -> CEO delegates, forbidden from hiring engineers oneself
+    # has HR, no PM -> CEO tells HR to hire a Product Manager
     d1 = SimulatedAgentRunner._directive(ceo, [{"role": "ceo"}, {"role": "hr-director"}], [])
-    assert "Do not create_agent" in d1 and "hire engineers" in d1
-    # HR perspective: missing engineers -> HR hires
+    assert "Product Manager" in d1
+    # HR perspective: no PM -> HR hires PM first
     hr = AgentProfile(agent_id="h", name="H", role="hr-director", department="People", personality=Personality())
     d2 = SimulatedAgentRunner._directive(hr, [{"role": "ceo"}, {"role": "hr-director"}], [])
-    assert "create_agent" in d2 and "senior-engineer" in d2
+    assert "Product Manager" in d2
+    # HR with PM + a hiring-request task -> HR hires per request
+    _T = type("T", (), {"id": "t1", "title": "Hiring request: need 1 senior-engineer - backend"})
+    d3 = SimulatedAgentRunner._directive(
+        hr,
+        [{"role": "ceo"}, {"role": "hr-director"}, {"role": "product-manager"}],
+        [_T()],
+    )
+    assert "hiring requests" in d3 and "create_agent" in d3
 
 
 # ── Live calls (requires LLM_LIVE_TEST=1 + real key + Redis) ──

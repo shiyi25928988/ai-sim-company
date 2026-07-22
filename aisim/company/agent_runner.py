@@ -231,53 +231,71 @@ class SimulatedAgentRunner:
 
     @staticmethod
     def _directive(profile: AgentProfile, agents: list, tasks: list) -> str:
-        """Give concrete action directives based on role/team/task state (strong guidance, to avoid spinning + divide labor)."""
+        """Give concrete action directives based on role/team/task state (PM-driven hiring flow)."""
         roles = {a.get("role") for a in agents}
         if profile.role == "ceo":
             if "hr-director" not in roles:
                 return (
-                    "⚠️ You are the only one in the company. Immediately create_agent to hire an HR Director "
-                    '(role="hr-director", department="People", salary=120000) - this is the only role you hire directly.'
+                    "⚠️ You are the only one. Immediately create_agent to hire an HR Director "
+                    '(role="hr-director", department="People", salary=120000).'
                 )
-            # HR is in place: hiring engineers/designers is HR's job, CEO no longer create_agent to hire
-            if "senior-engineer" not in roles or "junior-engineer" not in roles:
+            if "product-manager" not in roles:
                 return (
-                    "HR is in place. Hiring senior-engineer and junior-engineer is HR's job. "
-                    "**Do not create_agent to hire engineers yourself.** Use send_message to instruct HR (id in team list) to hire; "
-                    "this tick you may plan project direction first."
-                )
-            if "designer" not in roles and len(agents) < 5:
-                return (
-                    "Engineering team is in place. Use send_message to have HR hire a designer (don't hire yourself); "
-                    "also use create_task to assign the first task to a senior-engineer."
+                    "HR is in place. Use send_message to instruct HR to hire a Product Manager next "
+                    '(role="product-manager", department="Product", salary≈130000) - the PM will plan the product and tell HR what roles to hire.'
                 )
             return (
-                "Team is complete, **stop hiring**. Use create_task to assign work to engineers "
-                "(assignee_role='senior-engineer', clear title/description); create 1 new task per tick until 2-3 are in flight."
+                "HR + PM are in place. Focus on strategy: create_task for product direction, "
+                "call_meeting to align. Do not hire directly."
             )
         if profile.role == "hr-director":
-            missing = []
-            if "senior-engineer" not in roles:
-                missing.append("senior-engineer")
-            if "junior-engineer" not in roles:
-                missing.append("junior-engineer")
-            if missing:
+            if "product-manager" not in roles:
                 return (
-                    f"You are HR, responsible for hiring. The team is missing {'/'.join(missing)}; "
-                    "immediately use create_agent to hire (senior first, then junior)."
+                    'Hire a Product Manager first (role="product-manager", department="Product", salary≈130000) - '
+                    "the PM will assess the business and raise hiring requests to you."
                 )
-            if "designer" not in roles and len(agents) < 5:
-                return "Engineering team is complete; use create_agent to hire a designer."
-            return "Team is complete, **stop hiring**. You may use send_message to help with communication."
-        # Engineers / designers
-        if tasks:
-            ids = ", ".join(t.id for t in tasks)
+            hiring_tasks = [t for t in tasks if "hiring" in (t.title or "").lower()]
+            if hiring_tasks:
+                reqs = "; ".join(t.title for t in hiring_tasks)
+                return (
+                    f"PM has hiring requests: {reqs}. create_agent per request (use the role/scope in the task), "
+                    "then complete_task to mark it fulfilled. Don't hire beyond what the PM requested."
+                )
             return (
-                f"Immediately use complete_task to finish one of the tasks (pick any task_id from above: {ids}). "
-                "web_search has no real search API backing it, and write_code/run_tests are stubs - no need to call them; "
-                "write in result what you implemented and what you produced."
+                "PM is in place but no hiring requests yet. Wait for the PM to assess needs - don't hire speculatively."
             )
-        return "No pending tasks; use send_message to ask the CEO for work."
+        if profile.role == "product-manager":
+            return (
+                "Analyze the business description and decide what roles/skills the product needs. "
+                "If not done yet, create hiring-request tasks for HR (assignee_role='hr-director', "
+                "title='Hiring request: need <count> <role> - <reason>', description with scope/skills) - one per role. "
+                "Then create product tasks (features/milestones, assignee_role='senior-engineer' or 'designer')."
+            )
+        if profile.role == "senior-engineer":
+            if tasks:
+                ids = ", ".join(t.id for t in tasks)
+                return (
+                    f"Pick up a task (task_id from: {ids}). write_file the code, then run_claude_code to test/verify. "
+                    "Use code_review on team members' files to ensure quality. "
+                    "complete_task only after verification - describe what you delivered and how you verified it."
+                )
+            return "No pending tasks; use code_review to review the team's work, or ask the PM for more."
+        if profile.role == "junior-engineer":
+            if tasks:
+                ids = ", ".join(t.id for t in tasks)
+                return (
+                    f"Pick up a task (task_id from: {ids}). write_file the code, then run_claude_code to test/verify before complete_task. "
+                    "If stuck, ask_for_help. Describe what you delivered and how you verified it in complete_task."
+                )
+            return "No pending tasks; use send_message to ask a senior engineer or the PM for work."
+        if profile.role == "designer":
+            if tasks:
+                ids = ", ".join(t.id for t in tasks)
+                return (
+                    f"Pick up a task (task_id from: {ids}). write_file design docs/assets, verify they meet the requirements, then complete_task."
+                )
+            return "No pending tasks; use send_message to ask the PM for work."
+        return "No pending tasks; use send_message to ask the PM for work."
 
     # ── Tool execution (returns a result string for the LLM's next turn) ──
     async def _execute_tool(
@@ -385,6 +403,27 @@ class SimulatedAgentRunner:
 
         if name.startswith("mcp_"):
             return await self.hub.mcp_manager.call_tool(name, args)
+
+        if name == "code_review":
+            path = args.get("path", "").lstrip("/")
+            scope = args.get("scope", "shared")
+            base = Path(self.hub.config.company.workspace_dir)
+            sub = agent_id if scope == "personal" else "shared"
+            root = (base / sub).resolve()
+            full = (root / path).resolve()
+            if not str(full).startswith(str(root)) or not full.exists() or full.is_dir():
+                return f"File not found: {path}"
+            content = full.read_text(encoding="utf-8", errors="replace")[:4000]
+            review_prompt = (
+                f"Review this file ({scope}/{path}) for correctness, edge cases, readability, and test coverage. "
+                "List issues concisely; if it looks correct, say so.\n\n```\n" + content + "\n```"
+            )
+            resp = await self.hub.llm_gateway.chat(
+                profile, [{"role": "user", "content": review_prompt}], tools=[]
+            )
+            await self.hub.emit_frontend(
+                {"type": "agent_action", "agent": profile.name, "action": f"code_review {scope}/{path}"})
+            return f"Review of {scope}/{path}:\n{resp.content or resp.error or '(no response)'}"
 
         if name in ("write_file", "read_file", "list_files"):
             path = args.get("path", "").lstrip("/")

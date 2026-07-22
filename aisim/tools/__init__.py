@@ -59,6 +59,7 @@ def all_tools() -> dict[str, BaseTool]:
 # Import each tool module to trigger registration
 from aisim.tools import (  # noqa: E402,F401  registration side effect
     call_meeting,
+    code_review,
     complete_task,
     create_agent,
     create_skill,

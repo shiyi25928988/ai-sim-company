@@ -433,7 +433,18 @@ class CompanyHub:
         priority: str = "normal",
         created_by: str = "",
     ) -> dict:
-        """CEO/HR create a task and dispatch it (by role or by specific Agent)."""
+        """PM/CEO create a task. Dedup: skip if a similar pending task exists or too many pending."""
+        existing = await self.task_manager.list()
+        pending = [t for t in existing if t.status != "done"]
+        if len(pending) >= 8:
+            logger.info("create_task 跳过: 已有 %d 个未完成任务 (上限 8)", len(pending))
+            return {"skipped": "too many pending tasks", "pending": len(pending)}
+        title_lower = title.lower().strip()
+        for t in pending:
+            existing_lower = t.title.lower().strip()
+            if title_lower == existing_lower or title_lower in existing_lower or existing_lower in title_lower:
+                logger.info("create_task 跳过: 与现有任务重叠 '%s'", t.title)
+                return {"skipped": "duplicate", "existing": t.title}
         task = await self.task_manager.create(
             title=title,
             description=description,

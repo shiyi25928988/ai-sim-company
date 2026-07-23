@@ -340,8 +340,8 @@ Tool: {name}
                     '(role="product-manager", department="Product", salary≈130000) - the PM will plan the product and tell HR what roles to hire.'
                 )
             return (
-                "HR + PM are in place. Focus on strategy: create_task for product direction, "
-                "call_meeting to align. Do not hire directly."
+                "HR + PM are in place. Focus on strategy: use send_message to coordinate, "
+                "call_meeting to align. Let the PM create product tasks - don't create_task yourself."
             )
         if profile.role == "hr-director":
             if "product-manager" not in roles:

@@ -53,5 +53,36 @@ On the console, click **📢 CEO Directive** -> type an instruction (e.g. "add a
 
 ## Configuration
 
-- **`.env`** - `LLM_API_KEY` (required), `LLM_MODEL` / `LLM_BASE_URL` / `LLM_PROVIDER` (for OpenAI-compatible endpoints like DeepSeek), Redis, simulation speed.
-- **`config/company.yaml`** - business (name / description / budget / workspace_dir), CEO, LLM routing, MCP servers. The `/setup` page writes the `company` section.
+### `.env` (environment variables)
+
+Copy `.env.example` to `.env` and fill in. The backend auto-loads it on startup. These vars are referenced by `config/company.yaml` via `${VAR}` placeholders.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `LLM_API_KEY` | yes | - | LLM API key (configured once; agents never see it). |
+| `LLM_PROVIDER` | no | `openai` | LLM provider. Use `openai` for any OpenAI-compatible endpoint. |
+| `LLM_MODEL` | no | `gpt-4o-mini` | Default model for all agents. |
+| `LLM_BASE_URL` | no | (official OpenAI) | OpenAI-compatible endpoint. DeepSeek: `https://api.deepseek.com/v1`; Zhipu: `https://open.bigmodel.cn/api/paas/v4`; one-api: `http://localhost:3000/v1`. |
+| `LLM_TOOLS_ENABLED` | no | `true` | Enable function-calling (agent tools). `false` if the endpoint doesn't support tools (agents still think, plain text). |
+| `LLM_MAX_ITERS` | no | `3` | Max LLM<->tool loop rounds per agent per tick. `1` = cheapest; `3` = can chain multiple tools. |
+| `LLM_DAILY_BUDGET` | no | `2000000` | Daily token budget (cost cap). `0`/negative = unlimited. |
+| `LLM_RPM_LIMIT` | no | `0` | Requests-per-minute cap. `0` = unlimited. Set to match your API key's rate limit to avoid 429s. |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | no | `localhost` / `6379` / `123456` / `0` | Redis connection. Or set `REDIS_URL` (takes precedence). |
+| `AGENT_BACKEND` | no | `simulated` | `simulated` (local dev) or `docker` (production). |
+| `TICK_INTERVAL_MS` | no | `5000` | Simulation tick interval (ms). Larger = slower clock, less LLM cost. |
+| `SIM_AUTO_START` | no | `false` | `true` = auto-run on startup; `false` = paused (manual Play). |
+| `AGENT_THINK_EVERY` | no | `1` | Agent thinks once every N ticks. `1` = every tick; larger saves cost. |
+| `AGENT_STEP_DELAY_MS` | no | `800` | Interval between agents in step mode (ms). |
+
+**DeepSeek example:**
+```
+LLM_API_KEY=sk-...
+LLM_MODEL=deepseek-v4-flash
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_PROVIDER=openai
+LLM_RPM_LIMIT=60
+```
+
+### `config/company.yaml`
+
+Business (name / description / budget / workspace_dir), CEO, LLM routing, MCP servers. The `/setup` page writes the `company` section; MCP servers are managed on `/mcp`.

@@ -53,5 +53,36 @@ reset.bat                        :: 清数据重来
 
 ## 配置
 
-- **`.env`** - `LLM_API_KEY`（必需），`LLM_MODEL` / `LLM_BASE_URL` / `LLM_PROVIDER`（OpenAI 兼容端点如 DeepSeek），Redis，仿真速度。
-- **`config/company.yaml`** - 业务（名称/描述/预算/工作区），CEO，LLM 路由，MCP server。`/setup` 页写 `company` 段。
+### `.env`（环境变量）
+
+复制 `.env.example` 为 `.env` 并填值。后端启动时自动加载。这些变量通过 `config/company.yaml` 的 `${VAR}` 占位符引用。
+
+| 变量 | 必需 | 默认 | 说明 |
+|---|---|---|---|
+| `LLM_API_KEY` | 是 | - | LLM API Key（只配一次，agent 不感知）。 |
+| `LLM_PROVIDER` | 否 | `openai` | LLM 提供方。OpenAI 兼容端点都用 `openai`。 |
+| `LLM_MODEL` | 否 | `gpt-4o-mini` | 默认模型。 |
+| `LLM_BASE_URL` | 否 | （官方 OpenAI） | OpenAI 兼容端点。DeepSeek: `https://api.deepseek.com/v1`；智谱: `https://open.bigmodel.cn/api/paas/v4`；one-api: `http://localhost:3000/v1`。 |
+| `LLM_TOOLS_ENABLED` | 否 | `true` | 启用 function-calling（agent 工具调用）。端点不支持时设 `false`（agent 仍思考，纯文本）。 |
+| `LLM_MAX_ITERS` | 否 | `3` | 单 agent 单 tick 的 LLM<->工具最大循环轮数。`1` 最省；`3` 可连续调多工具。 |
+| `LLM_DAILY_BUDGET` | 否 | `2000000` | 每日 token 预算（成本上限）。`0`/负数 = 无限。 |
+| `LLM_RPM_LIMIT` | 否 | `0` | 每分钟请求数上限。`0` = 无限。设为 API key 实际限速可避免 429。 |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | 否 | `localhost` / `6379` / `123456` / `0` | Redis 连接。或设 `REDIS_URL`（优先）。 |
+| `AGENT_BACKEND` | 否 | `simulated` | `simulated`（本地开发）或 `docker`（生产）。 |
+| `TICK_INTERVAL_MS` | 否 | `5000` | 仿真 tick 间隔（毫秒）。越大越慢，LLM 成本越低。 |
+| `SIM_AUTO_START` | 否 | `false` | `true` = 启动即跑；`false` = 暂停（手动 Play）。 |
+| `AGENT_THINK_EVERY` | 否 | `1` | Agent 每 N tick 思考一次。`1` = 每次；调大省成本。 |
+| `AGENT_STEP_DELAY_MS` | 否 | `800` | 单步模式下 agent 间间隔（毫秒）。 |
+
+**DeepSeek 示例：**
+```
+LLM_API_KEY=sk-...
+LLM_MODEL=deepseek-v4-flash
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_PROVIDER=openai
+LLM_RPM_LIMIT=60
+```
+
+### `config/company.yaml`
+
+业务（名称/描述/预算/工作区），CEO，LLM 路由，MCP server。`/setup` 页写 `company` 段；MCP server 在 `/mcp` 页管理。

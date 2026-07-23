@@ -12,7 +12,7 @@ export default function Page() {
     <main className="grid h-full grid-rows-[auto_1fr_auto] gap-2 p-2">
       <HUD />
 
-      <div className="grid min-h-0 grid-cols-1 gap-2 md:grid-cols-[16rem_1fr] lg:grid-cols-[16rem_1fr_20rem]">
+      <div className="grid h-full min-h-0 grid-cols-1 gap-2 md:grid-cols-[16rem_1fr] lg:grid-cols-[16rem_1fr_20rem]">
         <TaskBoard />
         <LogFeed />
         <AgentPanel />

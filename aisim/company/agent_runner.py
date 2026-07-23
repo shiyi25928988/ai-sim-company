@@ -33,6 +33,7 @@ class _AgentRuntime:
     profile: AgentProfile
     memory: MemoryManager = field(default_factory=lambda: MemoryManager(""))
     busy: bool = False
+    idle_count: int = 0
 
 
 class SimulatedAgentRunner:
@@ -123,6 +124,16 @@ class SimulatedAgentRunner:
         try:
             profile = rt.profile
             tasks = await self.hub.task_manager.pending_for(agent_id, profile.role)
+            # non-management roles with no task: after 2 consecutive idle ticks, lay off
+            if not tasks and profile.role not in ("ceo", "hr-director", "product-manager"):
+                rt.idle_count += 1
+                if rt.idle_count >= 5:
+                    await self.hub.remove_agent(agent_id)
+                    logger.info("[%s] 连续 %d 轮无任务，解雇", profile.name, rt.idle_count)
+                else:
+                    logger.info("[%s] 无任务，idle %d/5", profile.name, rt.idle_count)
+                return
+            rt.idle_count = 0  # has task, reset idle counter
             # if already working on a task, don't claim a new one (focus until complete)
             has_in_progress = any(
                 t.assignee == agent_id and t.status == TaskStatus.IN_PROGRESS for t in tasks
@@ -140,7 +151,6 @@ class SimulatedAgentRunner:
 
             # ── Multi-turn tool loop with quality controls ──
             tool_call_count = 0
-            last_tool_name = ""
             for _ in range(max_iters):
                 mcp_tools = self.hub.mcp_manager.list_all_tools()
                 resp = await self.hub.llm_gateway.chat(profile, messages, tools=profile.tools + mcp_tools)
@@ -160,14 +170,6 @@ class SimulatedAgentRunner:
                     break
 
                 tool_call_count += 1
-                # Anti-loop: max 2 tool calls of the same type in a row
-                same_tool_count = sum(1 for m in messages if any(
-                    tc.get("function", {}).get("name", "") == last_tool_name
-                    for tc in (m.get("tool_calls") or [])
-                ))
-                if same_tool_count >= 2:
-                    logger.info("[%s] 连续调用同类工具超2次，停止循环", agent_id)
-                    break
 
                 # Add the assistant's tool_calls to the conversation, execute each and feed results back
                 # Wrap with structured tags and auto-summary for long outputs
@@ -181,7 +183,6 @@ class SimulatedAgentRunner:
                 for tc in resp.tool_calls:
                     fn = tc.get("function", {}) if isinstance(tc, dict) else {}
                     name = fn.get("name", "")
-                    last_tool_name = name
                     raw_args = fn.get("arguments", "{}")
                     try:
                         args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})

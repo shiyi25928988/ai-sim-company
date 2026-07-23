@@ -60,7 +60,11 @@ class FakeMessageBus:
 
 class FakeTaskManager:
     async def pending_for(self, agent_id, role):
-        return []
+        from aisim.shared.models import Task, TaskStatus
+        return [Task(id="task-1-x", title="Test task", status=TaskStatus.PENDING, assignee="", assignee_role=role)]
+
+    async def claim(self, task_id, agent_id):
+        return None
 
 
 class FakeHub:
@@ -108,6 +112,9 @@ class FakeHub:
     async def complete_task(self, task_id, agent_id, result) -> dict:
         self.completed.append({"task_id": task_id, "by": agent_id, "result": result})
         return {"task_id": task_id, "status": "done"}
+
+    async def remove_agent(self, agent_id) -> dict:
+        return {"removed": agent_id}
 
     async def share_skill(self, **kw) -> dict:
         self.shared.append(kw)

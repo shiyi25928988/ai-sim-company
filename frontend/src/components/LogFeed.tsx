@@ -57,7 +57,7 @@ export function LogFeed() {
   }, [filtered.length]);
 
   return (
-    <div className="pixel-panel flex h-full min-w-0 flex-col px-3 py-1 text-xs">
+    <div className="pixel-panel flex h-full min-h-0 min-w-0 flex-col px-3 py-1 text-xs">
       <div className="mb-1 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <button

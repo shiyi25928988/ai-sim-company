@@ -91,6 +91,9 @@ class TaskManager:
         if task.status == TaskStatus.DONE:
             logger.info("任务已被 %s 完成: %s", task.completed_by, task_id)
             return task
+        if task.assignee != "" and task.assignee != agent_id:
+            logger.warning("complete: task %s 已被 %s 认领，%s 无法完成", task_id, task.assignee, agent_id)
+            return None
         if task.assignee == "":
             task.assignee = agent_id  # claim
         task.status = TaskStatus.DONE
@@ -99,6 +102,21 @@ class TaskManager:
         task.completed_tick = tick
         await self.bus.hset_json(channels.KEY_TASKS, task.id, _to_dict(task))
         logger.info("任务完成: %s by %s", task.title, agent_id)
+        return task
+
+    async def claim(self, task_id: str, agent_id: str) -> Task | None:
+        """Claim a task for an agent (sets assignee + in_progress). Returns None if already claimed by another."""
+        task = await self.get(task_id)
+        if task is None or task.status == TaskStatus.DONE:
+            return None
+        if task.assignee != "" and task.assignee != agent_id:
+            return None  # claimed by another
+        if task.assignee == agent_id:
+            return task  # already claimed by this agent
+        task.assignee = agent_id
+        task.status = TaskStatus.IN_PROGRESS
+        await self.bus.hset_json(channels.KEY_TASKS, task.id, _to_dict(task))
+        logger.info("任务认领: %s by %s", task.title, agent_id)
         return task
 
     async def get(self, task_id: str) -> Task | None:

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from aisim.agent.memory import MemoryEntry, MemoryManager
-from aisim.shared.models import AgentProfile
+from aisim.shared.models import AgentProfile, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +123,15 @@ class SimulatedAgentRunner:
         try:
             profile = rt.profile
             tasks = await self.hub.task_manager.pending_for(agent_id, profile.role)
+            # if already working on a task, don't claim a new one (focus until complete)
+            has_in_progress = any(
+                t.assignee == agent_id and t.status == TaskStatus.IN_PROGRESS for t in tasks
+            )
+            if not has_in_progress:
+                unclaimed = [t for t in tasks if t.assignee == ""]
+                if unclaimed:
+                    await self.hub.task_manager.claim(unclaimed[0].id, agent_id)
+                    tasks = await self.hub.task_manager.pending_for(agent_id, profile.role)
             user_msg = self._build_prompt(profile, snapshot, rt.memory, tasks)
             messages: list[dict] = [{"role": "user", "content": user_msg}]
             max_iters = self.hub.config.llm.max_iters

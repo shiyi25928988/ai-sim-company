@@ -86,8 +86,8 @@ class Config:
 
     @property
     def agent_backend(self) -> str:
-        """Agent container backend: simulated (local dev default) | docker (production)."""
-        return os.environ.get("AGENT_BACKEND", "simulated").lower()
+        """Agent backend (always simulated - Docker mode removed)."""
+        return "simulated"
 
 
 def _expand(value: str) -> str:

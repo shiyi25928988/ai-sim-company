@@ -95,9 +95,10 @@ class CompanyHub:
         if self._started:
             return
         logger.info("CompanyHub 启动中...")
-        await self.message_bus.connect(self.config.redis_url)
-        await self.agent_manager.connect(self.config)
         self.db.connect()
+        await self.message_bus.connect()
+        self.message_bus.attach_db(self.db)
+        await self.agent_manager.connect(self.config)
         self._restore_state()
         await self.skill_pool.seed_presets()
         await self.seed_skill_packs()

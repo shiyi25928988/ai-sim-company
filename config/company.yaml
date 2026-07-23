@@ -11,9 +11,9 @@ ceo:
   role: ceo
   salary: 0
 company:
-  business_description: 金融科技公司，需要开发一款股票市场的量化分析工具
+  business_description: 一家软件公司，开发一款给销售人员个人使用的CRM 客户关系管理工具
   initial_capital: 50000000000
-  monthly_budget: 8000000
+  monthly_budget: 800000
   name: Demo AI Co.
   workspace_dir: D:\data\workspace
 llm:

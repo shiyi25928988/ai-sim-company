@@ -563,7 +563,10 @@ class CompanyHub:
     # ═══ Workspace files ═══
     def _ws_root(self, scope: str, agent_id: str | None = None) -> Path:
         base = Path(self.config.company.workspace_dir)
-        sub = agent_id if scope == "personal" else "shared"
+        if scope == "personal":
+            sub = agent_id or "personal"
+        else:
+            sub = "shared"
         return (base / sub).resolve()
 
     async def list_workspace(self, path: str, scope: str, agent_id: str | None = None) -> list[dict]:

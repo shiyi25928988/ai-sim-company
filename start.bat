@@ -10,8 +10,6 @@ REM ====================================================================
 set ROOT=%~dp0
 cd /d %ROOT%
 
-set AGENT_BACKEND=simulated
-
 if "!LLM_API_KEY!"=="" (
   echo [WARN] LLM_API_KEY not in env - if not set here, make sure .env has it.
   echo        Without it agent LLM calls will fail.

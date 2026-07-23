@@ -60,7 +60,7 @@ reset.bat                        :: 清数据重来
 | 变量 | 必需 | 默认 | 说明 |
 |---|---|---|---|
 | `LLM_API_KEY` | 是 | - | LLM API Key（只配一次，agent 不感知）。 |
-| `LLM_PROVIDER` | 否 | `openai` | LLM 提供方。OpenAI 兼容端点都用 `openai`。 |
+| `LLM_PROVIDER` | 否 | `openai` | 接口类型：`openai`（OpenAI 兼容 `/chat/completions`）或 `anthropic`（原生 `/v1/messages`）。 |
 | `LLM_MODEL` | 否 | `gpt-4o-mini` | 默认模型。 |
 | `LLM_BASE_URL` | 否 | （官方 OpenAI） | OpenAI 兼容端点。DeepSeek: `https://api.deepseek.com/v1`；智谱: `https://open.bigmodel.cn/api/paas/v4`；one-api: `http://localhost:3000/v1`。 |
 | `LLM_TOOLS_ENABLED` | 否 | `true` | 启用 function-calling（agent 工具调用）。端点不支持时设 `false`（agent 仍思考，纯文本）。 |
@@ -74,6 +74,15 @@ reset.bat                        :: 清数据重来
 | `AGENT_THINK_EVERY` | 否 | `1` | Agent 每 N tick 思考一次。`1` = 每次；调大省成本。 |
 | `AGENT_STEP_DELAY_MS` | 否 | `800` | 单步模式下 agent 间间隔（毫秒）。 |
 
+#### LLM 接口
+
+支持两种接口类型，由 `LLM_PROVIDER` 选择：
+
+- **`openai`**（默认）- OpenAI 兼容 `/chat/completions`。支持 OpenAI、DeepSeek、智谱、Moonshot、Qwen、one-api/new-api、OpenRouter 等。设 `LLM_BASE_URL` 为端点。
+- **`anthropic`** - Anthropic 原生 `/v1/messages`。直连 Claude 官方 API。`LLM_BASE_URL` 留空。
+
+系统内部用 OpenAI 消息格式；选 `anthropic` 时消息/工具自动转换。
+
 **DeepSeek 示例：**
 ```
 LLM_API_KEY=sk-...
@@ -81,6 +90,14 @@ LLM_MODEL=deepseek-v4-flash
 LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_PROVIDER=openai
 LLM_RPM_LIMIT=60
+```
+
+**Anthropic（Claude）示例：**
+```
+LLM_API_KEY=sk-ant-...
+LLM_MODEL=claude-sonnet-5
+LLM_PROVIDER=anthropic
+LLM_BASE_URL=
 ```
 
 ### `config/company.yaml`

@@ -48,9 +48,15 @@ class LLMGateway:
         self.daily_budget = config.daily_budget
         self.usage_today = 0
         # Provider is injectable (MockTransport for tests); otherwise created from config
-        self.provider = provider or OpenAICompatibleProvider(
-            api_key=config.api_key, base_url=config.base_url
-        )
+        if provider is not None:
+            self.provider = provider
+        elif config.provider == "anthropic":
+            from aisim.llm.anthropic_provider import AnthropicProvider
+            self.provider = AnthropicProvider(api_key=config.api_key, base_url=config.base_url)
+        else:
+            self.provider = OpenAICompatibleProvider(
+                api_key=config.api_key, base_url=config.base_url
+            )
         # Company Skill Pool (injected by the Hub; injects Skills into the System Prompt)
         self.skill_pool = None
         # Concurrency limit to avoid LLM rate limits (429)

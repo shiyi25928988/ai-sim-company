@@ -60,7 +60,7 @@ Copy `.env.example` to `.env` and fill in. The backend auto-loads it on startup.
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `LLM_API_KEY` | yes | - | LLM API key (configured once; agents never see it). |
-| `LLM_PROVIDER` | no | `openai` | LLM provider. Use `openai` for any OpenAI-compatible endpoint. |
+| `LLM_PROVIDER` | no | `openai` | Interface type: `openai` (OpenAI-compatible `/chat/completions`) or `anthropic` (native `/v1/messages`). |
 | `LLM_MODEL` | no | `gpt-4o-mini` | Default model for all agents. |
 | `LLM_BASE_URL` | no | (official OpenAI) | OpenAI-compatible endpoint. DeepSeek: `https://api.deepseek.com/v1`; Zhipu: `https://open.bigmodel.cn/api/paas/v4`; one-api: `http://localhost:3000/v1`. |
 | `LLM_TOOLS_ENABLED` | no | `true` | Enable function-calling (agent tools). `false` if the endpoint doesn't support tools (agents still think, plain text). |
@@ -74,6 +74,15 @@ Copy `.env.example` to `.env` and fill in. The backend auto-loads it on startup.
 | `AGENT_THINK_EVERY` | no | `1` | Agent thinks once every N ticks. `1` = every tick; larger saves cost. |
 | `AGENT_STEP_DELAY_MS` | no | `800` | Interval between agents in step mode (ms). |
 
+#### LLM interface
+
+Two interface types are supported, selected by `LLM_PROVIDER`:
+
+- **`openai`** (default) - OpenAI-compatible `/chat/completions`. Works with OpenAI, DeepSeek, Zhipu, Moonshot, Qwen, one-api/new-api proxies, OpenRouter, etc. Set `LLM_BASE_URL` to the endpoint.
+- **`anthropic`** - Anthropic native `/v1/messages`. Direct connection to Claude official API (`api.anthropic.com`). Leave `LLM_BASE_URL` empty.
+
+The system uses OpenAI message format internally; when `anthropic` is selected, messages/tools are converted automatically on the wire.
+
 **DeepSeek example:**
 ```
 LLM_API_KEY=sk-...
@@ -81,6 +90,14 @@ LLM_MODEL=deepseek-v4-flash
 LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_PROVIDER=openai
 LLM_RPM_LIMIT=60
+```
+
+**Anthropic (Claude) example:**
+```
+LLM_API_KEY=sk-ant-...
+LLM_MODEL=claude-sonnet-5
+LLM_PROVIDER=anthropic
+LLM_BASE_URL=
 ```
 
 ### `config/company.yaml`

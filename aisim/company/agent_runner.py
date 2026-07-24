@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from aisim.agent.memory import MemoryEntry, MemoryManager
-from aisim.shared.models import AgentProfile, TaskStatus
+from aisim.shared.models import AgentProfile, AgentStatus, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +142,7 @@ class SimulatedAgentRunner:
                 unclaimed = [t for t in tasks if t.assignee == ""]
                 if unclaimed:
                     await self.hub.task_manager.claim(unclaimed[0].id, agent_id)
+                    await self.hub.agent_manager.set_status(agent_id, AgentStatus.WORKING)
                     tasks = await self.hub.task_manager.pending_for(agent_id, profile.role)
             user_msg = self._build_prompt(profile, snapshot, rt.memory, tasks)
             messages: list[dict] = [{"role": "user", "content": user_msg}]
@@ -370,8 +371,9 @@ Tool: {name}
             if tasks:
                 ids = ", ".join(t.id for t in tasks)
                 return (
-                    f"Pick up a task (task_id from: {ids}). write_file the code, then run_claude_code to test/verify. "
-                    "Use code_review on team members' files to ensure quality. "
+                    f"Pick up a task (task_id from: {ids}). Use run_claude_code to implement it - pass the task description "
+                    "and any relevant design docs (read_file from workspace/skills/ or shared/) in the prompt. "
+                    "Then run_claude_code again to test/verify. Use code_review on team members' files. "
                     "complete_task only after verification - describe what you delivered and how you verified it."
                 )
             return "No pending tasks; use code_review to review the team's work, or ask the PM for more."
@@ -379,7 +381,8 @@ Tool: {name}
             if tasks:
                 ids = ", ".join(t.id for t in tasks)
                 return (
-                    f"Pick up a task (task_id from: {ids}). write_file the code, then run_claude_code to test/verify before complete_task. "
+                    f"Pick up a task (task_id from: {ids}). Use run_claude_code to implement it - pass the task description "
+                    "and relevant design docs in the prompt. Then run_claude_code to test/verify before complete_task. "
                     "If stuck, ask_for_help. Describe what you delivered and how you verified it in complete_task."
                 )
             return "No pending tasks; use send_message to ask a senior engineer or the PM for work."
@@ -387,7 +390,8 @@ Tool: {name}
             if tasks:
                 ids = ", ".join(t.id for t in tasks)
                 return (
-                    f"Pick up a task (task_id from: {ids}). write_file design docs/assets, verify they meet the requirements, then complete_task."
+                    f"Pick up a task (task_id from: {ids}). Use run_claude_code to create design docs/assets - pass the task "
+                    "description and any existing design context in the prompt. Verify the output meets requirements, then complete_task."
                 )
             return "No pending tasks; use send_message to ask the PM for work."
         return "No pending tasks; use send_message to ask the PM for work."
@@ -566,7 +570,7 @@ Tool: {name}
                  "action": f"run_claude_code: {prompt[:60]}"})
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    claude_path, "-p", prompt,
+                    claude_path, "-p", prompt, "--dangerously-skip-permissions",
                     cwd=cwd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,

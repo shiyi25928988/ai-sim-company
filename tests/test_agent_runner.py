@@ -67,11 +67,17 @@ class FakeTaskManager:
         return None
 
 
+class FakeAgentManager:
+    async def set_status(self, agent_id, status):
+        pass
+
+
 class FakeHub:
     def __init__(self, *responses: LLMResponse) -> None:
         self.llm_gateway = FakeGateway(*responses)
         self.message_bus = FakeMessageBus()
         self.task_manager = FakeTaskManager()
+        self.agent_manager = FakeAgentManager()
         self.config = SimpleNamespace(
             llm=SimpleNamespace(max_iters=3),
             simulation=SimpleNamespace(agent_think_every=1),

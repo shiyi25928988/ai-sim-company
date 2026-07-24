@@ -35,11 +35,6 @@ llm:
     command: uvx
     name: powerpoint
     transport: stdio
-  - args:
-    - mcp-pandoc
-    command: uvx
-    name: mcp-pandoc
-    transport: stdio
   provider: ${LLM_PROVIDER}
   routing: {}
   rpm_limit: ${LLM_RPM_LIMIT}

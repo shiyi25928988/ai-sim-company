@@ -472,6 +472,7 @@ class CompanyHub:
         task = await self.task_manager.complete(task_id, agent_id, result, self.clock.tick)
         if task is None:
             return None
+        await self.agent_manager.set_status(agent_id, AgentStatus.READY)
         await self.emit_frontend(
             {
                 "type": "task_completed",
@@ -605,7 +606,7 @@ class CompanyHub:
         names: list[str] = []
         for pid in participants:
             st = await self.agent_manager.get(pid)
-            if st:
+            if st and st.get("status") != "working":
                 parts.append({"name": st["name"], "role": st["role"], "id": pid})
                 names.append(st["name"])
         if not parts:

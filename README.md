@@ -24,14 +24,14 @@ The LLM API key is configured once; agents never see it.
 ### One-time setup
 
 ```bat
-init.bat                         :: checks Python/Node/Redis, installs deps, builds frontend
+init.bat                         :: checks Python/Node/MCP tools, installs deps, builds frontend
 copy .env.example .env           :: fill in LLM_API_KEY (+ optional LLM_MODEL / LLM_BASE_URL)
 ```
 
 ### Run
 
 ```bat
-start.bat                        :: start Redis + backend (:8000) + frontend (:3000)
+start.bat                        :: start backend (:8000) + frontend (:3000)
 stop.bat                         :: stop services
 reset.bat                        :: clear data and start fresh
 ```
@@ -67,7 +67,6 @@ Copy `.env.example` to `.env` and fill in. The backend auto-loads it on startup.
 | `LLM_MAX_ITERS` | no | `3` | Max LLM<->tool loop rounds per agent per tick. `1` = cheapest; `3` = can chain multiple tools. |
 | `LLM_DAILY_BUDGET` | no | `2000000` | Daily token budget (cost cap). `0`/negative = unlimited. |
 | `LLM_RPM_LIMIT` | no | `0` | Requests-per-minute cap. `0` = unlimited. Set to match your API key's rate limit to avoid 429s. |
-| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | no | `localhost` / `6379` / `123456` / `0` | Redis connection. Or set `REDIS_URL` (takes precedence). |
 | `AGENT_BACKEND` | no | `simulated` | `simulated` (local dev) or `docker` (production). |
 | `TICK_INTERVAL_MS` | no | `5000` | Simulation tick interval (ms). Larger = slower clock, less LLM cost. |
 | `SIM_AUTO_START` | no | `false` | `true` = auto-run on startup; `false` = paused (manual Play). |

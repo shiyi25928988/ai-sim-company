@@ -24,14 +24,14 @@ LLM API Key 只配一次，agent 不感知。
 ### 一次性初始化
 
 ```bat
-init.bat                         :: 检查 Python/Node/Redis，装依赖，编译前端
+init.bat                         :: 检查 Python/Node/MCP 工具，装依赖，编译前端
 copy .env.example .env           :: 填 LLM_API_KEY（+ 可选 LLM_MODEL / LLM_BASE_URL）
 ```
 
 ### 运行
 
 ```bat
-start.bat                        :: 启动 Redis + 后端(:8000) + 前端(:3000)
+start.bat                        :: 启动 后端(:8000) + 前端(:3000)
 stop.bat                         :: 停止服务
 reset.bat                        :: 清数据重来
 ```
@@ -67,7 +67,6 @@ reset.bat                        :: 清数据重来
 | `LLM_MAX_ITERS` | 否 | `3` | 单 agent 单 tick 的 LLM<->工具最大循环轮数。`1` 最省；`3` 可连续调多工具。 |
 | `LLM_DAILY_BUDGET` | 否 | `2000000` | 每日 token 预算（成本上限）。`0`/负数 = 无限。 |
 | `LLM_RPM_LIMIT` | 否 | `0` | 每分钟请求数上限。`0` = 无限。设为 API key 实际限速可避免 429。 |
-| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | 否 | `localhost` / `6379` / `123456` / `0` | Redis 连接。或设 `REDIS_URL`（优先）。 |
 | `AGENT_BACKEND` | 否 | `simulated` | `simulated`（本地开发）或 `docker`（生产）。 |
 | `TICK_INTERVAL_MS` | 否 | `5000` | 仿真 tick 间隔（毫秒）。越大越慢，LLM 成本越低。 |
 | `SIM_AUTO_START` | 否 | `false` | `true` = 启动即跑；`false` = 暂停（手动 Play）。 |

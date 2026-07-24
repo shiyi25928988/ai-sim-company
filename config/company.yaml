@@ -35,6 +35,13 @@ llm:
     command: uvx
     name: powerpoint
     transport: stdio
+  - args:
+    - mcp-server-fetch
+    command: uvx
+    env:
+      PYTHONIOENCODING: utf-8
+    name: mcp-server-fetch
+    transport: stdio
   provider: ${LLM_PROVIDER}
   routing: {}
   rpm_limit: ${LLM_RPM_LIMIT}

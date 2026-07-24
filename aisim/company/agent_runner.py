@@ -127,11 +127,11 @@ class SimulatedAgentRunner:
             # non-management roles with no task: after 2 consecutive idle ticks, lay off
             if not tasks and profile.role not in ("ceo", "hr-director", "product-manager"):
                 rt.idle_count += 1
-                if rt.idle_count >= 5:
+                if rt.idle_count >= 20:
                     await self.hub.remove_agent(agent_id)
                     logger.info("[%s] 连续 %d 轮无任务，解雇", profile.name, rt.idle_count)
                 else:
-                    logger.info("[%s] 无任务，idle %d/5", profile.name, rt.idle_count)
+                    logger.info("[%s] 无任务，idle %d/20", profile.name, rt.idle_count)
                 return
             rt.idle_count = 0  # has task, reset idle counter
             # if already working on a task, don't claim a new one (focus until complete)
@@ -362,10 +362,12 @@ Tool: {name}
             )
         if profile.role == "product-manager":
             return (
-                "Analyze the business description and decide what roles/skills the product needs. "
-                "If not done yet, create hiring-request tasks for HR (assignee_role='hr-director', "
-                "title='Hiring request: need <count> <role> - <reason>', description with scope/skills) - one per role. "
-                "Then create product tasks (features/milestones, assignee_role='senior-engineer' or 'designer')."
+                "Analyze the business and decide what work is needed. "
+                "Create hiring-request tasks for HR (assignee_role='hr-director') if hiring is needed. "
+                "Create product tasks and assign them DIRECTLY to specific agents - use assignee=<agent_id> "
+                "(pick agents from the team list with status=ready, not working). "
+                "Check the team list: any ready (non-working) agent needs a task - assign one immediately. "
+                "Don't duplicate existing tasks."
             )
         if profile.role == "senior-engineer":
             if tasks:
